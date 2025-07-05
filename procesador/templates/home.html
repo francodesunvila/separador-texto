@@ -1,0 +1,350 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Añadido para responsividad -->
+    <title>Conciliador Web</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Importa la fuente Inter de Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'estilos.css' %}">
+</head>
+
+<body class="modern-body">
+    <!-- Overlay de carga (Loader) -->
+    <div id="overlay" class="loader-overlay hidden">
+        <div class="loader-content">
+            <div class="spinner"></div>
+            <div class="loading-text">Procesando...</div>
+        </div>
+    </div>
+
+    <!-- Modal de Mensajes Personalizado -->
+    <div id="customModal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <p id="modalMessage" class="modal-message"></p>
+            <button onclick="hideModal()" class="modal-button">Aceptar</button>
+        </div>
+    </div>
+
+    <!-- Contenedor principal de la aplicación -->
+    <div class="app-container">
+
+        <!-- Encabezado de la aplicación -->
+        <header class="app-header">
+            <h1 class="main-title">SEPARADOR DE TEXTO</h1>
+            <p class="subtitle">Organiza y estructura tus datos de forma eficiente.</p>
+        </header>
+
+        <!-- Mensaje de Django (si existe) -->
+        {% if mensaje %}
+            <p class="django-message">{{ mensaje }}</p>
+        {% endif %}
+
+        <form method="POST" enctype="multipart/form-data" onsubmit="return validarYMostrarLoader();" class="main-form">
+            {% csrf_token %}
+            <!-- Sección de Carga de Archivos -->
+            <section class="section-card">
+                <h2 class="section-title">Carga de Archivos</h2>
+
+                <!-- Carga de Archivo TXT -->
+                <div class="form-group">
+                    <label for="txtFile" class="form-label">Archivo TXT:</label>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="txtFile" name="archivo" class="hidden-file-input" accept=".txt" required>
+                        <label for="txtFile" class="custom-file-button">
+                            Seleccionar archivo
+                        </label>
+                        <span id="txtFileName" class="file-name-display">Ningún archivo seleccionado</span>
+                    </div>
+                </div>
+
+                <!-- Importar diseño desde Excel -->
+                <div class="form-group">
+                    <label for="excelDiseno" class="form-label">Importar diseño desde Excel (<span class="font-mono">.xlsx</span> con columnas: <span class="font-mono">campo, posicion, caracter</span>):</label>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="excelDiseno" name="excel_diseno" class="hidden-file-input" accept=".xlsx,.xls">
+                        <label for="excelDiseno" class="custom-file-button">
+                            Seleccionar archivo
+                        </label>
+                        <span id="excelFileName" class="file-name-display">Ningún archivo seleccionado</span>
+                    </div>
+                </div>
+
+                <!-- Botones de acción para Excel -->
+                <div class="button-group excel-buttons">
+                    <button type="button" onclick="procesarDisenoExcel()" class="modern-button button-blue">
+                        <svg class="button-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Procesar diseño desde Excel
+                    </button>
+                    <button type="button" onclick="cancelarDisenoExcel()" class="modern-button button-red">
+                        <svg class="button-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Cancelar diseño desde Excel
+                    </button>
+                </div>
+            </section>
+
+            <!-- Sección de Diseño de Campos -->
+            <section class="section-card">
+                <h2 class="section-title">DISEÑO DE CAMPOS</h2>
+                <div class="table-container">
+                    <table id="tabla-campos" class="modern-table">
+                        <thead>
+                            <tr><th>Campo</th><th>Posición</th><th>Carácter</th><th>Quitar</th></tr>
+                        </thead>
+                        <tbody id="campos">
+                            <!-- Fila de ejemplo (se puede duplicar con JS) -->
+                            <tr>
+                                <td><input type="text" name="nombre[]" placeholder="Ej: banco" required class="modern-input"></td>
+                                <td><input type="number" name="inicio[]" placeholder="Ej: 0" required class="modern-input"></td>
+                                <td><input type="number" name="longitud[]" placeholder="Ej: 3" required class="modern-input"></td>
+                                <td><button type="button" onclick="this.closest('tr').remove()" class="remove-button">
+                                    <svg class="button-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                </button></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Botones de acción de campos -->
+                <div class="button-group field-buttons">
+                    <button type="button" onclick="agregarCampo()" class="modern-button button-green">
+                        <svg class="button-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                        Agregar campo
+                    </button>
+                    <button type="submit" class="modern-button button-purple">
+                        <svg class="button-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                        Finalizar y generar vista previa
+                    </button>
+                </div>
+                <div id="errores" class="error-message"></div>
+            </section>
+        </form>
+
+        {% if preview %}
+            <section class="section-card">
+                <h3 class="section-title preview-title">Vista previa (primeras 5 filas)</h3>
+                <div class="table-container">
+                    <table class="modern-table">
+                        <thead>
+                            <tr>{% for key in preview.0.keys %}<th>{{ key }}</th>{% endfor %}</tr>
+                        </thead>
+                        <tbody>
+                            {% for fila in preview %}
+                                <tr>{% for valor in fila.values %}<td>{{ valor }}</td>{% endfor %}</tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <form id="formDescarga" method="POST" action="{% url 'descargar_excel' %}" onsubmit="return iniciarDescarga();" class="button-group download-buttons">
+                    {% csrf_token %}
+                    <button type="submit" id="btnDescargar" class="modern-button button-teal">
+                        <svg class="button-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Descargar Excel completo
+                    </button>
+                    <span id="spinnerDescarga" class="inline-spinner hidden">
+                        <span class="inline-spinner-circle"></span>Procesando...
+                    </span>
+                    <button type="button" onclick="cancelarDescarga()" class="modern-button button-red">
+                        <svg class="button-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Cancelar descarga
+                    </button>
+                </form>
+
+                <form method="POST" action="{% url 'eliminar_preview' %}" onsubmit="return mostrarEliminar();" class="button-group delete-buttons">
+                    {% csrf_token %}
+                    <button type="submit" id="btnEliminar" class="modern-button button-gray">
+                        <svg class="button-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        Eliminar vista previa
+                    </button>
+                    <span id="spinnerEliminar" class="inline-spinner hidden">
+                        <span class="inline-spinner-circle"></span>Procesando...
+                    </span>
+                </form>
+            </section>
+        {% endif %}
+    </div>
+
+   <script>
+  // 🔷 MODAL PERSONALIZADO
+  function showModal(message) {
+    document.getElementById('modalMessage').textContent = message;
+    document.getElementById('customModal').classList.remove('hidden');
+  }
+
+  function hideModal() {
+    document.getElementById('customModal').classList.add('hidden');
+  }
+
+  // 🔷 ACTUALIZAR NOMBRES DE ARCHIVOS
+  document.getElementById('txtFile').addEventListener('change', function(e) {
+    const fileName = e.target.files[0] ? e.target.files[0].name : 'Ningún archivo seleccionado';
+    document.getElementById('txtFileName').textContent = fileName;
+  });
+
+  document.getElementById('excelDiseno').addEventListener('change', function(e) {
+    const fileName = e.target.files[0] ? e.target.files[0].name : 'Ningún archivo seleccionado';
+    document.getElementById('excelFileName').textContent = fileName;
+  });
+
+  // 🔷 AGREGAR CAMPO MANUALMENTE
+  function agregarCampo() {
+    const tbody = document.getElementById('campos');
+    const fila = document.createElement('tr');
+    fila.innerHTML = `
+      <td><input type="text" name="nombre[]" placeholder="Ej: campo" required class="modern-input"></td>
+      <td><input type="number" name="inicio[]" placeholder="Ej: 0" required class="modern-input"></td>
+      <td><input type="number" name="longitud[]" placeholder="Ej: 5" required class="modern-input"></td>
+      <td><button type="button" onclick="this.closest('tr').remove()" class="remove-button">
+        <svg class="button-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button></td>
+    `;
+    tbody.appendChild(fila);
+  }
+
+  // 🔷 VALIDAR CAMPOS SUPERPUESTOS
+  function camposSonValidos() {
+    const inicios = document.querySelectorAll('input[name="inicio[]"]');
+    const longitudes = document.querySelectorAll('input[name="longitud[]"]');
+    const nombres = document.querySelectorAll('input[name="nombre[]"]');
+    let campos = [];
+
+    for (let i = 0; i < inicios.length; i++) {
+      const ini = parseInt(inicios[i].value);
+      const len = parseInt(longitudes[i].value);
+      const nom = nombres[i].value.trim();
+
+      if (isNaN(ini) || isNaN(len)) {
+        campos.push({ start: NaN, end: NaN, inputs: [inicios[i], longitudes[i]], invalido: true });
+      } else {
+        campos.push({ start: ini, end: ini + len - 1, inputs: [inicios[i], longitudes[i]], invalido: false, nombre: nom });
+      }
+    }
+
+    campos.forEach(c => c.inputs.forEach(i => i.classList.remove("input-error")));
+
+    let errores = [];
+
+    for (let i = 0; i < campos.length; i++) {
+      for (let j = i + 1; j < campos.length; j++) {
+        if (!campos[i].invalido && !campos[j].invalido &&
+            campos[i].start <= campos[j].end &&
+            campos[j].start <= campos[i].end) {
+          campos[i].inputs.forEach(i => i.classList.add("input-error"));
+          campos[j].inputs.forEach(i => i.classList.add("input-error"));
+          errores.push(`🔴 "${campos[i].nombre}" se superpone con "${campos[j].nombre}"`);
+        }
+      }
+    }
+
+    campos.forEach(c => {
+      if (c.invalido) c.inputs.forEach(i => i.classList.add("input-error"));
+    });
+
+    if (errores.length > 0) {
+      showModal("⚠️ Campos superpuestos:\n\n" + errores.join("\n"));
+      return false;
+    }
+
+    return true;
+  }
+
+  // 🔷 MOSTRAR LOADER SOLO SI TODO ESTÁ OK
+  function validarYMostrarLoader() {
+    if (!camposSonValidos()) return false;
+    mostrarLoader();
+    return true;
+  }
+
+  function mostrarLoader() {
+    document.getElementById("overlay").classList.remove("hidden");
+    return true;
+  }
+
+  // 🔷 DESCARGAR EXCEL
+  function iniciarDescarga() {
+    const btn = document.getElementById("btnDescargar");
+    const spinner = document.getElementById("spinnerDescarga");
+
+    btn.disabled = true;
+    spinner.classList.remove("hidden");
+
+    setTimeout(() => {
+      btn.disabled = false;
+      spinner.classList.add("hidden");
+    }, 5000);
+
+    return true;
+  }
+
+  function cancelarDescarga() {
+    document.getElementById("btnDescargar").disabled = false;
+    document.getElementById("spinnerDescarga").classList.add("hidden");
+    showModal("✔️ Descarga cancelada.");
+  }
+
+  // 🔷 ELIMINAR PREVIEW
+  function mostrarEliminar() {
+    document.getElementById("btnEliminar").disabled = true;
+    document.getElementById("spinnerEliminar").classList.remove("hidden");
+    return true;
+  }
+
+  // 🔷 PROCESAR DISEÑO EXCEL
+  function extraerNumero(texto) {
+    const match = texto?.toString().match(/\d+/);
+    return match ? parseInt(match[0]) : "";
+  }
+
+  function procesarDisenoExcel() {
+    const file = document.getElementById("excelDiseno").files[0];
+    if (!file) return showModal("Seleccioná un archivo Excel primero.");
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(sheet);
+      if (!json[0]) return showModal("⚠️ El Excel está vacío o no tiene el formato esperado.");
+
+      const tbody = document.getElementById("campos");
+      tbody.innerHTML = "";
+
+      json.forEach(row => {
+        const nombre = row["campo"] || "";
+        const inicio = extraerNumero(row["posicion"]);
+        const longitud = extraerNumero(row["caracter"]);
+
+        const fila = document.createElement("tr");
+        fila.innerHTML = `
+          <td><input type="text" name="nombre[]" value="${nombre}" class="modern-input readonly" readonly></td>
+          <td><input type="number" name="inicio[]" value="${inicio}" class="modern-input readonly" readonly></td>
+          <td><input type="number" name="longitud[]" value="${longitud}" class="modern-input readonly" readonly></td>
+          <td><span class="excel-tag">Excel</span></td>
+        `;
+        tbody.appendChild(fila);
+      });
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function cancelarDisenoExcel() {
+    document.getElementById("campos").innerHTML = `
+      <tr>
+        <td><input type="text" name="nombre[]" placeholder="Ej: banco" required class="modern-input"></td>
+        <td><input type="number" name="inicio[]" placeholder="Ej: 0" required class="modern-input"></td>
+        <td><input type="number" name="longitud[]" placeholder="Ej: 3" required class="modern-input"></td>
+        <td><button type="button" onclick="this.closest('tr').remove()" class="remove-button">
+          <svg class="button-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button></td>
+      </tr>
+    `;
+    document.getElementById("excelDiseno").value = "";
+    document.getElementById('excelFileName').textContent = 'Ningún archivo seleccionado';
+  }
+</script>
+</body>
+</html>
