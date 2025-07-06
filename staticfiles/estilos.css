@@ -1,0 +1,497 @@
+/* estilos.css - Diseño Moderno 2025 */
+
+/* Fuentes */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* Variables de Color (para facilitar cambios globales) */
+:root {
+    --bg-dark: #1a1a1a;
+    --bg-medium: #252525;
+    --bg-light: #333333;
+    --text-light: #e0e0e0;
+    --text-muted: #a0a0a0;
+    --accent-teal: #00b3ad;
+    --accent-teal-dark: #009597;
+    --accent-blue: #217346; /* Tailwind blue-600 */
+    --accent-blue-dark: #123823; /* Tailwind blue-700 */
+    --accent-red: #dc2626; /* Tailwind red-600 */
+    --accent-red-dark: #b91c1c; /* Tailwind red-700 */
+    --accent-green: #16a34a; /* Tailwind green-600 */
+    --accent-green-dark: #15803d; /* Tailwind green-700 */
+    --accent-purple: #9333ea; /* Tailwind purple-600 */
+    --accent-purple-dark: #7e22ce; /* Tailwind purple-700 */
+    --accent-gray-button: #4b5563; /* Tailwind gray-600 */
+    --accent-gray-button-dark: #374151; /* Tailwind gray-700 */
+    --border-color: #444444;
+    --shadow-color: rgba(0, 0, 0, 0.4);
+}
+
+/* Base Body Styles */
+.modern-body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg-dark); /* Fondo oscuro uniforme */
+    color: var(--text-light);
+    margin: 0;
+    padding: 20px;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box; /* Asegura que padding no aumente el tamaño total */
+}
+
+/* Main Container */
+.app-container {
+    background-color: var(--bg-medium);
+    padding: 32px;
+    border-radius: 16px; /* Bordes más redondeados */
+    box-shadow: 0 20px 25px -5px var(--shadow-color), 0 8px 10px -6px var(--shadow-color); /* Sombra más pronunciada */
+    width: 100%;
+    max-width: 960px; /* Ancho máximo para el contenido */
+}
+
+/* Headers */
+.app-header {
+    text-align: center;
+    margin-bottom: 40px;
+}
+
+.main-title {
+    font-size: 3rem; /* Más grande */
+    font-weight: 700; /* Bold */
+    color: var(--accent-teal);
+    margin-bottom: 8px;
+    letter-spacing: 0.05em; /* Espaciado entre letras */
+    text-shadow: 0 0 15px rgba(0,179,173,0.6); /* Sombra más sutil y moderna */
+}
+
+.subtitle {
+    color: var(--text-muted);
+    font-size: 1.125rem; /* text-lg */
+}
+
+.section-title {
+    font-size: 1.875rem; /* text-2xl */
+    font-weight: 600; /* Semi-bold */
+    color: var(--text-light);
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.preview-title {
+    text-align: center; /* Alineación central para el título de la vista previa */
+}
+
+/* Form Elements */
+.main-form {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem; /* Espacio entre secciones del formulario */
+}
+
+.section-card {
+    background-color: var(--bg-light);
+    padding: 24px;
+    border-radius: 8px;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3); /* Sombra interna para efecto "hundido" */
+}
+
+.form-group {
+    margin-bottom: 1.5rem; /* Espacio entre grupos de formulario */
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-light);
+    font-weight: 500; /* Medium */
+    font-size: 1.125rem; /* text-lg */
+}
+
+.modern-input {
+    background-color: var(--bg-dark);
+    color: var(--text-light);
+    border: 1px solid var(--border-color);
+    padding: 10px 12px;
+    border-radius: 8px;
+    width: 100%; /* Ocupa todo el ancho disponible */
+    box-sizing: border-box; /* Incluye padding y border en el ancho */
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.modern-input:focus {
+    outline: none;
+    border-color: var(--accent-teal);
+    box-shadow: 0 0 0 3px rgba(0, 179, 173, 0.4); /* Sombra de enfoque */
+}
+
+.modern-input.readonly {
+    background-color: var(--bg-dark);
+    border-color: var(--border-color);
+    color: var(--text-muted); /* Texto más tenue para readonly */
+    cursor: not-allowed;
+}
+
+/* Custom File Input */
+.file-input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 16px; /* Espacio entre botón y nombre de archivo */
+}
+
+.hidden-file-input {
+    display: none; /* Oculta el input de tipo file nativo */
+}
+
+.custom-file-button {
+    cursor: pointer;
+    background-color: var(--accent-teal);
+    color: white;
+    font-weight: 600; /* Semi-bold */
+    padding: 10px 24px;
+    border-radius: 8px;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+.custom-file-button:hover {
+    background-color: var(--accent-teal-dark);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3);
+}
+
+.file-name-display {
+    color: var(--text-muted);
+    font-style: italic;
+    font-size: 0.95rem;
+}
+
+/* Buttons */
+.button-group {
+    display: flex;
+    flex-wrap: wrap; /* Permite que los botones se envuelvan en pantallas pequeñas */
+    gap: 16px; /* Espacio entre botones */
+    margin-top: 24px;
+    justify-content: center; /* Centra los botones en pantallas pequeñas */
+}
+
+.modern-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600; /* Semi-bold */
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    border: none;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+    color: white; /* Color de texto por defecto para botones */
+}
+
+.modern-button:hover {
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3);
+}
+
+.modern-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+/* Specific Button Colors */
+.button-blue { background-color: var(--accent-blue); }
+.button-blue:hover { background-color: var(--accent-blue-dark); }
+
+.button-red { background-color: var(--accent-red); }
+.button-red:hover { background-color: var(--accent-red-dark); }
+
+.button-green { background-color: var(--accent-green); }
+.button-green:hover { background-color: var(--accent-green-dark); }
+
+.button-purple { background-color: var(--accent-purple); }
+.button-purple:hover { background-color: var(--accent-purple-dark); }
+
+.button-teal { background-color: var(--accent-teal); }
+.button-teal:hover { background-color: var(--accent-teal-dark); }
+
+.button-gray { background-color: var(--accent-gray-button); }
+.button-gray:hover { background-color: var(--accent-gray-button-dark); }
+
+.remove-button {
+    background-color: var(--accent-red);
+    color: white;
+    padding: 8px;
+    border-radius: 50%; /* Botón redondo */
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+.remove-button:hover {
+    background-color: var(--accent-red-dark);
+    transform: scale(1.05);
+}
+
+.button-icon {
+    width: 20px;
+    height: 20px;
+    margin-right: 8px; /* Espacio entre icono y texto */
+}
+/* No margin-right for remove-button icon as it's just an icon */
+.remove-button .button-icon {
+    margin-right: 0;
+}
+
+
+/* Tables */
+.table-container {
+    overflow-x: auto; /* Permite scroll horizontal en pantallas pequeñas */
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    box-shadow: 0 10px 15px -3px var(--shadow-color), 0 4px 6px -2px var(--shadow-color);
+}
+
+.modern-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 0; /* Elimina el margen por defecto de la tabla */
+}
+
+.modern-table thead {
+    background-color: var(--bg-light);
+}
+
+.modern-table th,
+.modern-table td {
+    padding: 12px 24px;
+    text-align: left; /* Alineación a la izquierda para mejor lectura */
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-light);
+}
+
+.modern-table th {
+    font-weight: 500; /* Medium */
+    font-size: 0.75rem; /* text-xs */
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+.modern-table tbody {
+    background-color: var(--bg-medium);
+    color: var(--text-light);
+}
+
+.modern-table tbody tr:last-child td {
+    border-bottom: none; /* Elimina el borde inferior de la última fila */
+}
+
+.modern-table td input.modern-input {
+    width: calc(100% - 24px); /* Ajusta el ancho del input dentro de la celda */
+}
+
+/* Mensajes y Errores */
+.django-message {
+    color: var(--accent-green); /* Color para mensajes de éxito */
+    font-weight: 600; /* Semi-bold */
+    text-align: center;
+    margin-bottom: 1.5rem;
+}
+
+.error-message {
+    color: var(--accent-red); /* Color para mensajes de error */
+    font-weight: 600;
+    text-align: center;
+    margin-top: 1rem;
+}
+
+/* Overlay de carga (Loader) */
+.loader-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.7); /* Fondo más oscuro */
+    z-index: 9999;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.loader-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px;
+    background-color: var(--bg-medium);
+    border-radius: 8px;
+    box-shadow: 0 10px 15px rgba(0, 0, 0, 0.3);
+}
+
+.spinner {
+    border: 8px solid var(--border-color);
+    border-top: 8px solid var(--accent-teal);
+    border-radius: 50%;
+    width: 64px; /* Un poco más grande */
+    height: 64px;
+    animation: spin 1s linear infinite;
+}
+
+.loading-text {
+    margin-top: 16px;
+    color: white;
+    font-size: 1.25rem; /* text-xl */
+    font-weight: 600; /* Semi-bold */
+    text-align: center;
+}
+
+/* Spinners en línea */
+.inline-spinner {
+    display: inline-flex; /* Usar inline-flex para alinear con texto/botón */
+    align-items: center;
+    margin-left: 10px;
+    font-size: 0.875rem; /* text-sm */
+    color: var(--text-muted);
+    vertical-align: middle;
+}
+
+.inline-spinner-circle {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border-color);
+    border-top: 2px solid var(--accent-teal);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Modal Personalizado */
+.modal-overlay {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.7);
+    z-index: 10000; /* Mayor que el loader */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background-color: var(--bg-medium);
+    padding: 24px;
+    border-radius: 8px;
+    box-shadow: 0 10px 15px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    max-width: 400px;
+    width: 90%; /* Responsivo */
+}
+
+.modal-message {
+    font-size: 1.125rem; /* text-lg */
+    color: var(--text-light);
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.modal-button {
+    background-color: var(--accent-teal);
+    color: white;
+    font-weight: 600;
+    padding: 10px 24px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+}
+
+.modal-button:hover {
+    background-color: var(--accent-teal-dark);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Utilidad para ocultar elementos con JS */
+.hidden {
+    display: none !important;
+}
+
+.input-error {
+  border: 2px solid #ff4d4d;
+  background-color: #220000;
+}
+
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .modern-body {
+        padding: 10px;
+    }
+
+    .app-container {
+        padding: 20px;
+    }
+
+    .main-title {
+        font-size: 2.5rem; /* Más pequeño en móvil */
+    }
+
+    .section-title {
+        font-size: 1.5rem;
+    }
+
+    .form-label {
+        font-size: 1rem;
+    }
+
+    .file-input-wrapper {
+        flex-direction: column; /* Apila el botón y el nombre del archivo */
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .button-group {
+        flex-direction: column; /* Apila los botones */
+        gap: 12px;
+    }
+
+    .modern-button, .custom-file-button {
+        width: 100%; /* Botones de ancho completo */
+        padding: 12px; /* Más padding para facilitar el toque */
+    }
+
+    .modern-table th,
+    .modern-table td {
+        padding: 8px 12px; /* Menos padding en celdas de tabla */
+        font-size: 0.875rem; /* text-sm */
+    }
+
+    .modern-table td input.modern-input {
+        width: calc(100% - 12px); /* Ajusta el ancho del input dentro de la celda */
+    }
+}
+
+@media (max-width: 480px) {
+    .app-container {
+        padding: 15px;
+    }
+    .main-title {
+        font-size: 2rem;
+    }
+    .section-title {
+        font-size: 1.25rem;
+    }
+    .modern-button, .custom-file-button {
+        padding: 10px;
+        font-size: 0.9rem;
+    }
+}
