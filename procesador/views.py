@@ -67,6 +67,7 @@ def home(request):
                         longitud = extraer_numero(fila.get("caracter"))
                         if nombre and longitud > 0:
                             diseño.append({"nombre": nombre, "inicio": inicio, "longitud": longitud})
+                            print(f'DISEÑO → nombre={nombre} inicio={inicio} longitud={longitud}')
                     mensaje = "✅ Diseño importado desde Excel correctamente."
                 else:
                     mensaje = "⚠️ El Excel no contiene las columnas necesarias: campo, posicion, caracter."
@@ -89,6 +90,8 @@ def home(request):
                     continue
 
         conflictos = detectar_solapamientos(diseño)
+        print(f'Diseño final: {diseño}')
+
         if conflictos:
             resumen = conflictos[:5]
             if len(conflictos) > 5:
