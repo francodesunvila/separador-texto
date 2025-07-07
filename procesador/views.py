@@ -5,12 +5,11 @@ import pandas as pd
 import os
 import tempfile
 import traceback
+from openpyxl import Workbook
 
 def extraer_numero(texto):
     try:
-        match = str(texto).strip()
-        numbers = [int(s) for s in match.split() if s.isdigit()]
-        return numbers[0] if numbers else 0
+        return int(''.join([c for c in str(texto) if c.isdigit()]))
     except:
         return 0
 
@@ -40,13 +39,11 @@ def detectar_solapamientos(diseño):
     return conflictos
 
 def home(request):
-    preview = None
     mensaje = None
+    preview = []
     conflictos = []
-
-    if request.method == 'GET':
-        request.session["ruta_excel"] = None
-        request.session["nombre_excel"] = None
+    request.session["ruta_excel"] = None
+    request.session["nombre_excel"] = None
 
     if request.method == 'POST' and request.FILES.get('archivo'):
         archivo = request.FILES['archivo']
@@ -67,79 +64,64 @@ def home(request):
                         longitud = extraer_numero(fila.get("caracter"))
                         if nombre and longitud > 0:
                             diseño.append({"nombre": nombre, "inicio": inicio, "longitud": longitud})
+                    mensaje = "✅ Diseño importado desde Excel correctamente."
                 else:
-                    mensaje = "⚠️ El Excel no contiene las columnas necesarias: campo, posicion, caracter."
+                    mensaje = "⚠️ El Excel no contiene las columnas necesarias."
                     return render(request, 'home.html', {"mensaje": mensaje})
             except Exception as e:
-                mensaje = f"⚠️ No se pudo leer el Excel: {str(e)}"
+                mensaje = f"⚠️ Error al leer Excel: {str(e)}"
                 return render(request, 'home.html', {"mensaje": mensaje})
         else:
-            nombres = request.POST.getlist('nombre[]')
-            inicios = request.POST.getlist('inicio[]')
-            longitudes = request.POST.getlist('longitud[]')
-            for i in range(len(nombres)):
-                try:
-                    nombre = str(nombres[i]).strip()
-                    inicio = extraer_numero(inicios[i])
-                    longitud = extraer_numero(longitudes[i])
-                    if nombre and longitud > 0:
-                        diseño.append({"nombre": nombre, "inicio": inicio, "longitud": longitud})
-                except:
-                    continue
+            mensaje = "⚠️ No se adjuntó Excel de diseño."
+            return render(request, 'home.html', {"mensaje": mensaje})
 
         conflictos = detectar_solapamientos(diseño)
         if conflictos:
             resumen = conflictos[:5]
             if len(conflictos) > 5:
-                resumen.append(f"...y {len(conflictos) - 5} conflictos más.")
-            mensaje = "⚠️ Se detectaron superposiciones en el diseño."
-            return render(request, 'home.html', {
-                "mensaje": mensaje,
-                "conflictos": resumen
-            })
+                resumen.append(f"...y {len(conflictos) - 5} más.")
+            mensaje = "⚠️ Superposición de campos detectada."
+            return render(request, 'home.html', {"mensaje": mensaje, "conflictos": resumen})
 
-        datos = []
+        # Crear Excel línea por línea
+        wb = Workbook()
+        ws = wb.active
+        ws.append([campo["nombre"] for campo in diseño])
+
+        count = 0
         with open(full_path, "r", encoding="utf-8") as f:
             for linea in f:
                 linea = linea.rstrip('\n')
-                largo_linea = len(linea)
-                registro = {}
-                ultimo_final = 0
-
+                largo = len(linea)
+                fila = []
                 for campo in diseño:
-                    inicio = campo["inicio"]
-                    fin = inicio + campo["longitud"]
-                    registro[campo["nombre"]] = linea[inicio:fin].strip() if fin <= largo_linea else ""
-                    if fin > ultimo_final:
-                        ultimo_final = fin
+                    ini = campo["inicio"]
+                    fin = ini + campo["longitud"]
+                    valor = linea[ini:fin].strip() if fin <= largo else ""
+                    fila.append(valor)
+                ws.append(fila)
 
-                if ultimo_final < largo_linea:
-                    registro["Sin definir"] = linea[ultimo_final:].strip()
-                datos.append(registro)
+                if count < 20:
+                    preview.append(dict(zip([c["nombre"] for c in diseño], fila)))
+                count += 1
 
-        # ✅ Guardar Excel completo en archivo temporal
-        df = pd.DataFrame(datos)
-        df.fillna("", inplace=True)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
-            ruta_excel = tmp.name
-            df.to_excel(ruta_excel, index=False)
-
-        preview = df.head(20).to_dict(orient="records")
-        request.session["ruta_excel"] = ruta_excel
+        # Guardar Excel final
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
+        wb.save(tmp.name)
+        request.session["ruta_excel"] = tmp.name
         request.session["nombre_excel"] = os.path.splitext(archivo.name)[0] + ".xlsx"
-        mensaje = "✅ Vista previa generada con éxito."
 
-    return render(request, 'home.html', {
-        "mensaje": mensaje,
-        "preview": preview
-    })
+        mensaje = f"✅ {count:,} líneas procesadas correctamente."
+
+    return render(request, 'home.html', {"mensaje": mensaje, "preview": preview})
 
 def descargar_excel(request):
+    import traceback
     try:
         ruta = request.session.get("ruta_excel")
         nombre = request.session.get("nombre_excel", "resultado.xlsx")
 
-        if not ruta or not os.path.isfile(ruta):
+        if not ruta or not os.path.exists(ruta):
             print(f"⚠️ Archivo no encontrado: {ruta}")
             return HttpResponse("⚠️ No se encontró el archivo para descargar.")
 
