@@ -267,22 +267,31 @@
     return true;
   }
 
-  // 🔷 DESCARGAR EXCEL
-  function iniciarDescarga() {
-    const btn = document.getElementById("btnDescargar");
-    const spinner = document.getElementById("spinnerDescarga");
+ // 🔷 DESCARGAR EXCEL
+function iniciarDescarga() {
+  const btn = document.getElementById("btnDescargar");
+  const spinner = document.getElementById("spinnerDescarga");
 
-    btn.disabled = true;
-    spinner.classList.remove("hidden");
+  btn.disabled = true;
+  spinner.classList.remove("hidden");
 
-    setTimeout(() => {
-      btn.disabled = false;
-      spinner.classList.add("hidden");
-    }, 5000);
-
-    return true;
+  // Verificación extra opcional: si no hay preview, evita la descarga
+  const preview = document.querySelectorAll(".preview-title");
+  if (preview.length === 0) {
+    showModal("⚠️ No hay vista previa disponible para descargar.");
+    btn.disabled = false;
+    spinner.classList.add("hidden");
+    return false;
   }
 
+  // Este delay visual solo simula progreso en el frontend
+  setTimeout(() => {
+    btn.disabled = false;
+    spinner.classList.add("hidden");
+  }, 5000);
+
+  return true;
+}
   function cancelarDescarga() {
     document.getElementById("btnDescargar").disabled = false;
     document.getElementById("spinnerDescarga").classList.add("hidden");

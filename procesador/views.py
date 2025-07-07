@@ -5,6 +5,7 @@ import pandas as pd
 import os
 import re
 import tempfile
+import traceback
 
 def extraer_numero(texto):
     try:
@@ -16,15 +17,15 @@ def detectar_solapamientos(diseño):
     conflictos = []
     for i in range(len(diseño)):
         inicio_i = diseño[i]['inicio']
-        fin_i = inicio_i + diseño[i]['longitud']
+        fin_i = inicio_i + diseño[i]['longitud'] - 1
         nombre_i = diseño[i]['nombre']
 
         for j in range(i + 1, len(diseño)):
             inicio_j = diseño[j]['inicio']
-            fin_j = inicio_j + diseño[j]['longitud']
+            fin_j = inicio_j + diseño[j]['longitud'] - 1
             nombre_j = diseño[j]['nombre']
 
-            if max(inicio_i, inicio_j) < min(fin_i, fin_j):
+            if max(inicio_i, inicio_j) <= min(fin_i, fin_j):
                 conflictos.append(f'"{nombre_i}" se superpone con "{nombre_j}" 🔴')
 
     return conflictos
@@ -55,7 +56,8 @@ def home(request):
                         nombre = str(fila.get("campo", "")).strip()
                         inicio = extraer_numero(fila.get("posicion"))
                         longitud = extraer_numero(fila.get("caracter"))
-                        diseño.append({"nombre": nombre, "inicio": inicio, "longitud": longitud})
+                        if nombre and longitud > 0:
+                            diseño.append({"nombre": nombre, "inicio": inicio, "longitud": longitud})
                     mensaje = "✅ Diseño importado desde Excel correctamente."
                 else:
                     mensaje = "⚠️ El Excel no contiene las columnas necesarias: campo, posicion, caracter."
@@ -69,12 +71,11 @@ def home(request):
             longitudes = request.POST.getlist('longitud[]')
             for i in range(len(nombres)):
                 try:
-                    campo = {
-                        "nombre": nombres[i],
-                        "inicio": int(inicios[i]),
-                        "longitud": int(longitudes[i])
-                    }
-                    diseño.append(campo)
+                    nombre = str(nombres[i]).strip()
+                    inicio = extraer_numero(inicios[i])
+                    longitud = extraer_numero(longitudes[i])
+                    if nombre and longitud > 0:
+                        diseño.append({"nombre": nombre, "inicio": inicio, "longitud": longitud})
                 except:
                     continue
 
@@ -119,28 +120,33 @@ def home(request):
     })
 
 def descargar_excel(request):
-    datos = request.session.get("datos")
-    nombre_excel = request.session.get("nombre_excel", "salida.xlsx")
+    try:
+        datos = request.session.get("datos")
+        nombre_excel = request.session.get("nombre_excel", "salida.xlsx")
 
-    if not datos:
-        return HttpResponse("No hay datos procesados.")
+        if not datos or not isinstance(datos, list):
+            return HttpResponse("⚠️ No hay datos disponibles para descargar.")
 
-    df = pd.DataFrame(datos)
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
-        ruta = tmp.name
-        df.to_excel(ruta, index=False)
+        df = pd.DataFrame(datos)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
+            ruta = tmp.name
+            df.to_excel(ruta, index=False)
 
-    response = FileResponse(open(ruta, "rb"), as_attachment=True, filename=nombre_excel)
+        response = FileResponse(open(ruta, "rb"), as_attachment=True, filename=nombre_excel)
 
-    def borrar(r):
-        try:
-            os.remove(ruta)
-        except Exception as e:
-            print(f"⚠️ Error al borrar archivo: {e}")
-        return r
+        def borrar(r):
+            try:
+                os.remove(ruta)
+            except Exception as e:
+                print(f"⚠️ Error al borrar archivo: {e}")
+            return r
 
-    response.add_post_render_callback(borrar)
-    return response
+        response.add_post_render_callback(borrar)
+        return response
+
+    except Exception as e:
+        print("⚠️ Error al generar Excel:", traceback.format_exc())
+        return HttpResponse("⚠️ Error interno al generar el archivo Excel.")
 
 def eliminar_preview(request):
     request.session["datos"] = None
