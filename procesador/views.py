@@ -3,7 +3,6 @@ from django.core.files.storage import default_storage
 from django.http import HttpResponse, FileResponse
 import pandas as pd
 import os
-import re
 import tempfile
 import traceback
 
@@ -53,17 +52,21 @@ def home(request):
         full_path = default_storage.path(path)
 
         diseño = []
-
         excel = request.FILES.get('excel_diseno')
+
         if excel:
             try:
                 df_diseño = pd.read_excel(excel)
                 columnas = df_diseño.columns.str.lower()
                 if {"campo", "posicion", "caracter"}.issubset(set(columnas)):
+                    # ✅ Convertir columnas a enteros
+                    df_diseño["posicion"] = df_diseño["posicion"].astype(int)
+                    df_diseño["caracter"] = df_diseño["caracter"].astype(int)
+
                     for _, fila in df_diseño.iterrows():
                         nombre = str(fila.get("campo", "")).strip()
-                        inicio = extraer_numero(fila.get("posicion"))
-                        longitud = extraer_numero(fila.get("caracter"))
+                        inicio = int(fila.get("posicion"))
+                        longitud = int(fila.get("caracter"))
                         if nombre and longitud > 0:
                             diseño.append({"nombre": nombre, "inicio": inicio, "longitud": longitud})
                     mensaje = "✅ Diseño importado desde Excel correctamente."
@@ -134,14 +137,12 @@ def descargar_excel(request):
         datos = request.session.get("datos")
         nombre_excel = request.session.get("nombre_excel", "salida.xlsx")
 
-        # ✅ Validación segura
         if not datos or not isinstance(datos, list) or len(datos) == 0:
             return HttpResponse("⚠️ No hay datos disponibles para descargar.")
 
-        # Convertir a DataFrame
         df = pd.DataFrame(datos)
+        df.fillna("", inplace=True)  # ✅ Evita NaN que rompen to_excel
 
-        # ✅ Crear archivo temporal
         with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
             ruta = tmp.name
             try:
@@ -150,10 +151,8 @@ def descargar_excel(request):
                 print("⚠️ Error al escribir Excel:", traceback.format_exc())
                 return HttpResponse("⚠️ No se pudo generar el archivo Excel.")
 
-        # 📦 Descargar archivo
         response = FileResponse(open(ruta, "rb"), as_attachment=True, filename=nombre_excel)
 
-        # 🧹 Borrarlo automáticamente después
         def borrar(r):
             try:
                 os.remove(ruta)
