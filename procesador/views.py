@@ -16,14 +16,22 @@ def extraer_numero(texto):
 def detectar_solapamientos(diseño):
     conflictos = []
     for i in range(len(diseño)):
-        inicio_i = diseño[i]['inicio']
-        fin_i = inicio_i + diseño[i]['longitud'] - 1
-        nombre_i = diseño[i]['nombre']
+        try:
+            inicio_i = int(diseño[i]['inicio'])
+            longitud_i = int(diseño[i]['longitud'])
+            fin_i = inicio_i + longitud_i - 1
+            nombre_i = str(diseño[i]['nombre']).strip()
+        except:
+            continue
 
         for j in range(i + 1, len(diseño)):
-            inicio_j = diseño[j]['inicio']
-            fin_j = inicio_j + diseño[j]['longitud'] - 1
-            nombre_j = diseño[j]['nombre']
+            try:
+                inicio_j = int(diseño[j]['inicio'])
+                longitud_j = int(diseño[j]['longitud'])
+                fin_j = inicio_j + longitud_j - 1
+                nombre_j = str(diseño[j]['nombre']).strip()
+            except:
+                continue
 
             if max(inicio_i, inicio_j) <= min(fin_i, fin_j):
                 conflictos.append(f'"{nombre_i}" se superpone con "{nombre_j}" 🔴')
@@ -120,20 +128,32 @@ def home(request):
     })
 
 def descargar_excel(request):
+    import traceback
+
     try:
         datos = request.session.get("datos")
         nombre_excel = request.session.get("nombre_excel", "salida.xlsx")
 
-        if not datos or not isinstance(datos, list):
+        # ✅ Validación segura
+        if not datos or not isinstance(datos, list) or len(datos) == 0:
             return HttpResponse("⚠️ No hay datos disponibles para descargar.")
 
+        # Convertir a DataFrame
         df = pd.DataFrame(datos)
+
+        # ✅ Crear archivo temporal
         with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
             ruta = tmp.name
-            df.to_excel(ruta, index=False)
+            try:
+                df.to_excel(ruta, index=False)
+            except Exception as e:
+                print("⚠️ Error al escribir Excel:", traceback.format_exc())
+                return HttpResponse("⚠️ No se pudo generar el archivo Excel.")
 
+        # 📦 Descargar archivo
         response = FileResponse(open(ruta, "rb"), as_attachment=True, filename=nombre_excel)
 
+        # 🧹 Borrarlo automáticamente después
         def borrar(r):
             try:
                 os.remove(ruta)
@@ -145,7 +165,7 @@ def descargar_excel(request):
         return response
 
     except Exception as e:
-        print("⚠️ Error al generar Excel:", traceback.format_exc())
+        print("⚠️ Error general en descarga_excel():", traceback.format_exc())
         return HttpResponse("⚠️ Error interno al generar el archivo Excel.")
 
 def eliminar_preview(request):
