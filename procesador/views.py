@@ -5,7 +5,7 @@ import pandas as pd
 import os
 import tempfile
 import traceback
-from openpyxl import Workbook
+import xlsxwriter  # ✅ Usamos xlsxwriter para mejor rendimiento
 
 def extraer_numero(texto):
     try:
@@ -34,7 +34,6 @@ def detectar_solapamientos(diseño):
             if max(inicio_i, inicio_j) <= min(fin_i, fin_j):
                 conflictos.append(f'"{nombre_i}" se superpone con "{nombre_j}" 🔴')
     return conflictos
-
 def home(request):
     mensaje = None
     preview = []
@@ -100,7 +99,7 @@ def home(request):
                     preview.append(dict(zip([c["nombre"] for c in diseño], fila)))
                 total_lineas += 1
 
-        BLOQUE_SIZE = 50000
+        BLOQUE_SIZE = 50000  # ✅ Tamaño seguro para Render con 58 columnas
         total_bloques = (total_lineas + BLOQUE_SIZE - 1) // BLOQUE_SIZE
 
         for b in range(total_bloques):
@@ -136,33 +135,39 @@ def descargar_excel(request):
     except:
         return HttpResponse("⚠️ Bloque inválido.")
 
-    BLOQUE_SIZE = 100000
+    BLOQUE_SIZE = 50000
     inicio = (bloque - 1) * BLOQUE_SIZE
     fin = inicio + BLOQUE_SIZE
 
     try:
-        wb = Workbook(write_only=True)
-        ws = wb.create_sheet()
-        ws.append([campo["nombre"] for campo in diseño])
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f"_bloque{bloque}.xlsx")
+        workbook = xlsxwriter.Workbook(tmp.name, {'constant_memory': True})
+        worksheet = workbook.add_worksheet()
 
+        # Escribir encabezados
+        for col_index, campo in enumerate(diseño):
+            worksheet.write(0, col_index, campo["nombre"])
+
+        # Escribir datos del bloque
         with open(ruta, "r", encoding="utf-8") as f:
+            fila_excel = 1
             for i, linea in enumerate(f):
                 if i < inicio:
                     continue
                 if i >= fin:
                     break
-                linea = linea.rstrip('\n')
-                largo = len(linea)
-                fila = []
+                valores = []
+                largo = len(linea.rstrip('\n'))
                 for campo in diseño:
                     ini = campo["inicio"]
                     fin_campo = ini + campo["longitud"]
                     valor = linea[ini:fin_campo].strip() if fin_campo <= largo else ""
-                    fila.append(valor)
-                ws.append(fila)
+                    valores.append(valor)
+                for col_index, val in enumerate(valores):
+                    worksheet.write(fila_excel, col_index, val)
+                fila_excel += 1
 
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f"_bloque{bloque}.xlsx")
-        wb.save(tmp.name)
+        workbook.close()
         nombre_archivo = f"{nombre_base}_bloque{bloque}.xlsx"
         return FileResponse(open(tmp.name, "rb"), as_attachment=True, filename=nombre_archivo)
 

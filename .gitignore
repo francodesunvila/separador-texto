@@ -1,1 +1,39 @@
+# Entorno virtual
+venv/
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
 
+# Archivos temporales
+*.log
+*.pot
+*.mo
+*.swp
+*.swo
+*.orig
+*.tmp
+
+# Archivos de base de datos locales
+*.sqlite3
+*.db
+
+# Configuración de sistema operativo
+.DS_Store
+Thumbs.db
+
+# Archivos estáticos generados
+/staticfiles/
+/media/
+
+# Configuración de entorno
+.env
+.env.*
+
+# Archivos de compilación
+*.egg-info/
+dist/
+build/
+
+# Render (si usás blueprint)
+render.yaml
