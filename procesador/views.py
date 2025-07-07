@@ -99,7 +99,7 @@ def home(request):
                     preview.append(dict(zip([c["nombre"] for c in diseño], fila)))
                 total_lineas += 1
 
-        BLOQUE_SIZE = 50000  # ✅ Tamaño seguro para Render con 58 columnas
+        BLOQUE_SIZE = 20000  # ✅ Tamaño seguro para Render con 58 columnas
         total_bloques = (total_lineas + BLOQUE_SIZE - 1) // BLOQUE_SIZE
 
         for b in range(total_bloques):
