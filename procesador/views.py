@@ -126,7 +126,7 @@ def home(request):
 def descargar_directo(request, bloque_id):
     import re
 
-    ruta_txt = request.session.get("ruta_txt")
+    ruta = request.session.get("ruta_txt")
     diseño = request.session.get("diseño")
     nombre_base = request.session.get("nombre_base", "resultado")
     bloques = request.session.get("bloques_xlsx")
@@ -136,44 +136,47 @@ def descargar_directo(request, bloque_id):
     except:
         return HttpResponse("⚠️ Bloque inválido.")
 
-    if not ruta_txt or not os.path.exists(ruta_txt):
+    if not ruta or not os.path.exists(ruta):
         return HttpResponse("⚠️ Archivo TXT no encontrado.")
     if not diseño or not bloques or bloque_id < 1 or bloque_id > len(bloques):
         return HttpResponse("⚠️ Información de bloque no disponible.")
 
-    BLOQUE_SIZE = 50000  # 👈 Ajustamos para este test
+    BLOQUE_SIZE = 5000  # 🔒 Para que Render lo maneje bien
     inicio = (bloque_id - 1) * BLOQUE_SIZE
     fin = inicio + BLOQUE_SIZE
 
     try:
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f"_bloque{bloque_id}.csv", mode="w", encoding="utf-8")
-        nombres = [campo["nombre"] for campo in diseño]
-        tmp.write(",".join(nombres) + "\n")
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f"_bloque{bloque_id}.xlsx")
+        workbook = xlsxwriter.Workbook(tmp.name, {'constant_memory': True})
+        worksheet = workbook.add_worksheet()
 
-        with open(ruta_txt, "r", encoding="utf-8") as fuente:
-            for i, linea in enumerate(fuente):
+        # Escribir encabezados
+        for col_index, campo in enumerate(diseño):
+            worksheet.write(0, col_index, campo["nombre"])
+
+        with open(ruta, "r", encoding="utf-8") as f:
+            fila_excel = 1
+            for i, linea in enumerate(f):
                 if i < inicio:
                     continue
                 if i >= fin:
                     break
                 largo = len(linea.rstrip('\n'))
-                fila = []
-                for campo in diseño:
+                for col_index, campo in enumerate(diseño):
                     ini = campo["inicio"]
                     fin_campo = ini + campo["longitud"]
                     valor = linea[ini:fin_campo].strip() if fin_campo <= largo else ""
-                    valor = re.sub(r'[\x00-\x08\x0B-\x1F\x7F]', '', valor)  # 🧹 limpiamos control chars
-                    valor = valor.replace(",", "")  # 🧨 eliminamos comas internas
-                    fila.append(valor)
-                tmp.write(",".join(fila) + "\n")
+                    valor = re.sub(r'[\x00-\x08\x0B-\x1F\x7F]', '', valor)
+                    worksheet.write(fila_excel, col_index, valor)
+                fila_excel += 1
 
-        tmp.close()
-        nombre_archivo = f"{nombre_base}_bloque{bloque_id}.csv"
+        workbook.close()
+        nombre_archivo = f"{nombre_base}_bloque{bloque_id}.xlsx"
         return FileResponse(open(tmp.name, "rb"), as_attachment=True, filename=nombre_archivo)
 
     except Exception as e:
-        print("⚠️ Error generando CSV:", traceback.format_exc())
-        return HttpResponse("⚠️ No se pudo generar el archivo CSV.")
+        print("⚠️ Error generando Excel:", traceback.format_exc())
+        return HttpResponse("⚠️ No se pudo generar el archivo Excel.")
 
 def eliminar_preview(request):
     request.session["bloques_xlsx"] = []
