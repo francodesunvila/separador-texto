@@ -1,11 +1,11 @@
 from django.shortcuts import render, redirect
 from django.core.files.storage import default_storage
-from django.http import HttpResponse, FileResponse
+from django.http import HttpResponse
 import pandas as pd
 import os
 import tempfile
 import traceback
-import xlsxwriter  # ✅ Usamos xlsxwriter para mejor rendimiento
+import xlsxwriter
 
 def extraer_numero(texto):
     try:
@@ -34,12 +34,13 @@ def detectar_solapamientos(diseño):
             if max(inicio_i, inicio_j) <= min(fin_i, fin_j):
                 conflictos.append(f'"{nombre_i}" se superpone con "{nombre_j}" 🔴')
     return conflictos
+
 def home(request):
     mensaje = None
     preview = []
     conflictos = []
     request.session["bloques_xlsx"] = []
-    request.session["ruta_txt"] = None
+    request.session["rutas_excel"] = []
     request.session["nombre_base"] = None
     request.session["diseño"] = []
 
@@ -47,7 +48,6 @@ def home(request):
         archivo = request.FILES['archivo']
         path = default_storage.save(archivo.name, archivo)
         full_path = default_storage.path(path)
-        request.session["ruta_txt"] = full_path
         request.session["nombre_base"] = os.path.splitext(archivo.name)[0]
 
         diseño = []
@@ -84,31 +84,58 @@ def home(request):
 
         request.session["diseño"] = diseño
         bloques = []
+        rutas_excel = []
         total_lineas = 0
 
         with open(full_path, "r", encoding="utf-8") as f:
-            for i, linea in enumerate(f):
-                if i < 20:
-                    fila = []
-                    largo = len(linea.rstrip('\n'))
-                    for campo in diseño:
-                        ini = campo["inicio"]
-                        fin = ini + campo["longitud"]
-                        valor = linea[ini:fin].strip() if fin <= largo else ""
-                        fila.append(valor)
-                    preview.append(dict(zip([c["nombre"] for c in diseño], fila)))
-                total_lineas += 1
+            lineas = f.readlines()
+            total_lineas = len(lineas)
 
-        BLOQUE_SIZE = 20000  # ✅ Tamaño seguro para Render con 58 columnas
+        BLOQUE_SIZE = 20000
         total_bloques = (total_lineas + BLOQUE_SIZE - 1) // BLOQUE_SIZE
 
         for b in range(total_bloques):
             nombre = f"{request.session['nombre_base']}_bloque{b+1}.xlsx"
             bloques.append((b+1, nombre))
 
-        request.session["bloques_xlsx"] = bloques
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f"_bloque{b+1}.xlsx")
+            workbook = xlsxwriter.Workbook(tmp.name, {'constant_memory': True})
+            worksheet = workbook.add_worksheet()
 
-        mensaje = f"✅ {total_lineas:,} líneas detectadas. División en {total_bloques} bloques."
+            for col_index, campo in enumerate(diseño):
+                worksheet.write(0, col_index, campo["nombre"])
+
+            inicio = b * BLOQUE_SIZE
+            fin = min(inicio + BLOQUE_SIZE, total_lineas)
+
+            for fila_excel, i in enumerate(range(inicio, fin), start=1):
+                linea = lineas[i].rstrip('\n')
+                largo = len(linea)
+                valores = []
+                for campo in diseño:
+                    ini = campo["inicio"]
+                    fin_campo = ini + campo["longitud"]
+                    valor = linea[ini:fin_campo].strip() if fin_campo <= largo else ""
+                    valores.append(valor)
+                for col_index, val in enumerate(valores):
+                    worksheet.write(fila_excel, col_index, val)
+
+            workbook.close()
+            rutas_excel.append(tmp.name)
+
+            if b < 1:
+                fila_preview = []
+                for campo in diseño:
+                    ini = campo["inicio"]
+                    fin_campo = ini + campo["longitud"]
+                    valor = lineas[inicio][ini:fin_campo].strip() if fin_campo <= len(lineas[inicio]) else ""
+                    fila_preview.append(valor)
+                preview.append(dict(zip([c["nombre"] for c in diseño], fila_preview)))
+
+        request.session["bloques_xlsx"] = bloques
+        request.session["rutas_excel"] = rutas_excel
+
+        mensaje = f"✅ {total_lineas:,} líneas procesadas. Archivos generados en {total_bloques} bloques."
 
         return render(request, 'home.html', {
             "mensaje": mensaje,
@@ -117,67 +144,29 @@ def home(request):
         })
 
     return render(request, 'home.html')
-def descargar_excel(request):
-    bloque_id = request.GET.get("bloque")
-    ruta = request.session.get("ruta_txt")
-    diseño = request.session.get("diseño")
-    nombre_base = request.session.get("nombre_base", "resultado")
 
-    if not ruta or not os.path.exists(ruta):
-        return HttpResponse("⚠️ Archivo TXT no encontrado.")
-    if not diseño:
-        return HttpResponse("⚠️ Diseño no disponible.")
-    if not bloque_id:
-        return HttpResponse("⚠️ Bloque no especificado.")
+from django.http import FileResponse
+
+def descargar_directo(request, bloque_id):
+    rutas = request.session.get("rutas_excel")
+    bloques = request.session.get("bloques_xlsx")
 
     try:
-        bloque = int(bloque_id)
+        bloque_id = int(bloque_id)
     except:
         return HttpResponse("⚠️ Bloque inválido.")
 
-    BLOQUE_SIZE = 50000
-    inicio = (bloque - 1) * BLOQUE_SIZE
-    fin = inicio + BLOQUE_SIZE
+    if not rutas or bloque_id < 1 or bloque_id > len(rutas):
+        return HttpResponse("⚠️ Archivo no disponible.")
 
-    try:
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f"_bloque{bloque}.xlsx")
-        workbook = xlsxwriter.Workbook(tmp.name, {'constant_memory': True})
-        worksheet = workbook.add_worksheet()
-
-        # Escribir encabezados
-        for col_index, campo in enumerate(diseño):
-            worksheet.write(0, col_index, campo["nombre"])
-
-        # Escribir datos del bloque
-        with open(ruta, "r", encoding="utf-8") as f:
-            fila_excel = 1
-            for i, linea in enumerate(f):
-                if i < inicio:
-                    continue
-                if i >= fin:
-                    break
-                valores = []
-                largo = len(linea.rstrip('\n'))
-                for campo in diseño:
-                    ini = campo["inicio"]
-                    fin_campo = ini + campo["longitud"]
-                    valor = linea[ini:fin_campo].strip() if fin_campo <= largo else ""
-                    valores.append(valor)
-                for col_index, val in enumerate(valores):
-                    worksheet.write(fila_excel, col_index, val)
-                fila_excel += 1
-
-        workbook.close()
-        nombre_archivo = f"{nombre_base}_bloque{bloque}.xlsx"
-        return FileResponse(open(tmp.name, "rb"), as_attachment=True, filename=nombre_archivo)
-
-    except Exception as e:
-        print("⚠️ Error generando Excel:", traceback.format_exc())
-        return HttpResponse("⚠️ No se pudo generar el archivo Excel.")
+    ruta = rutas[bloque_id - 1]
+    nombre = bloques[bloque_id - 1][1] if bloques else f"bloque{bloque_id}.xlsx"
+    return FileResponse(open(ruta, "rb"), as_attachment=True, filename=nombre)
 
 def eliminar_preview(request):
     request.session["bloques_xlsx"] = []
-    request.session["ruta_txt"] = None
+    request.session["rutas_excel"] = []
     request.session["nombre_base"] = None
     request.session["diseño"] = []
     return redirect('home')
+

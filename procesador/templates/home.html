@@ -1,4 +1,5 @@
 {% load static %}
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -39,7 +40,7 @@
       <p class="django-message">{{ mensaje }}</p>
     {% endif %}
 
-    <form method="POST" enctype="multipart/form-data" onsubmit="return validarYMostrarLoader();" class="main-form">
+        <form method="POST" enctype="multipart/form-data" onsubmit="return validarYMostrarLoader();" class="main-form">
       {% csrf_token %}
       <section class="section-card">
         <h2 class="section-title">Carga de Archivos</h2>
@@ -127,7 +128,7 @@
                   <td>Bloque {{ b.0 }}</td>
                   <td>{{ b.1 }}</td>
                   <td>
-                    <a href="{% url 'descargar_excel' %}?bloque={{ b.0 }}" class="modern-button button-teal" target="_blank">
+                    <a href="{% url 'descargar_directo' bloque_id=b.0 %}" class="modern-button button-teal" target="_blank">
                       📥 Descargar
                     </a>
                   </td>
@@ -145,6 +146,7 @@
     {% endif %}
 
   </div> <!-- Cierre .app-container -->
+
 
 
 
