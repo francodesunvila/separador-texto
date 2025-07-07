@@ -45,7 +45,7 @@ def home(request):
     conflictos = []
 
     if request.method == 'GET':
-        request.session["datos"] = None
+        request.session["ruta_excel"] = None
         request.session["nombre_excel"] = None
 
     if request.method == 'POST' and request.FILES.get('archivo'):
@@ -67,8 +67,6 @@ def home(request):
                         longitud = extraer_numero(fila.get("caracter"))
                         if nombre and longitud > 0:
                             diseño.append({"nombre": nombre, "inicio": inicio, "longitud": longitud})
-                            print(f'DISEÑO → nombre={nombre} inicio={inicio} longitud={longitud}')
-                    mensaje = "✅ Diseño importado desde Excel correctamente."
                 else:
                     mensaje = "⚠️ El Excel no contiene las columnas necesarias: campo, posicion, caracter."
                     return render(request, 'home.html', {"mensaje": mensaje})
@@ -90,8 +88,6 @@ def home(request):
                     continue
 
         conflictos = detectar_solapamientos(diseño)
-        print(f'Diseño final: {diseño}')
-
         if conflictos:
             resumen = conflictos[:5]
             if len(conflictos) > 5:
@@ -121,10 +117,17 @@ def home(request):
                     registro["Sin definir"] = linea[ultimo_final:].strip()
                 datos.append(registro)
 
+        # ✅ Guardar Excel completo en archivo temporal
         df = pd.DataFrame(datos)
-        preview = df.head().to_dict(orient="records")
-        request.session["datos"] = df.to_dict(orient="records")
+        df.fillna("", inplace=True)
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
+            ruta_excel = tmp.name
+            df.to_excel(ruta_excel, index=False)
+
+        preview = df.head(20).to_dict(orient="records")
+        request.session["ruta_excel"] = ruta_excel
         request.session["nombre_excel"] = os.path.splitext(archivo.name)[0] + ".xlsx"
+        mensaje = "✅ Vista previa generada con éxito."
 
     return render(request, 'home.html', {
         "mensaje": mensaje,
@@ -132,34 +135,20 @@ def home(request):
     })
 
 def descargar_excel(request):
-    import traceback
-
     try:
-        datos = request.session.get("datos")
-        nombre_excel = request.session.get("nombre_excel", "salida.xlsx")
+        ruta = request.session.get("ruta_excel")
+        nombre = request.session.get("nombre_excel", "resultado.xlsx")
 
-        if not datos or not isinstance(datos, list) or len(datos) == 0:
-            return HttpResponse("⚠️ No hay datos disponibles para descargar.")
+        if not ruta or not os.path.exists(ruta):
+            return HttpResponse("⚠️ No se encontró el archivo para descargar.")
 
-        df = pd.DataFrame(datos)
-        df.fillna("", inplace=True)
-
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
-            ruta = tmp.name
-            try:
-                df.to_excel(ruta, index=False)
-            except Exception as e:
-                print("⚠️ Error al escribir Excel:", traceback.format_exc())
-                return HttpResponse("⚠️ No se pudo generar el archivo Excel.")
-
-        response = FileResponse(open(ruta, "rb"), as_attachment=True, filename=nombre_excel)
-        return response
+        return FileResponse(open(ruta, "rb"), as_attachment=True, filename=nombre)
 
     except Exception as e:
-        print("⚠️ Error general en descarga_excel():", traceback.format_exc())
-        return HttpResponse("⚠️ Error interno al generar el archivo Excel.")
+        print("⚠️ Error en descarga_excel:", traceback.format_exc())
+        return HttpResponse("⚠️ No se pudo generar el archivo Excel.")
 
 def eliminar_preview(request):
-    request.session["datos"] = None
+    request.session["ruta_excel"] = None
     request.session["nombre_excel"] = None
     return redirect('home')
