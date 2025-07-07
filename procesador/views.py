@@ -40,11 +40,16 @@ def home(request):
     preview = []
     conflictos = []
     request.session["bloques_csv"] = []
+    request.session["ruta_txt"] = None
+    request.session["nombre_csv_base"] = None
+    request.session["diseño"] = []
 
     if request.method == 'POST' and request.FILES.get('archivo'):
         archivo = request.FILES['archivo']
         path = default_storage.save(archivo.name, archivo)
         full_path = default_storage.path(path)
+        request.session["ruta_txt"] = full_path
+        request.session["nombre_csv_base"] = os.path.splitext(archivo.name)[0]
 
         diseño = []
         excel = request.FILES.get('excel_diseno')
@@ -60,7 +65,6 @@ def home(request):
                         longitud = extraer_numero(fila.get("caracter"))
                         if nombre and longitud > 0:
                             diseño.append({"nombre": nombre, "inicio": inicio, "longitud": longitud})
-                    mensaje = "✅ Diseño importado desde Excel correctamente."
                 else:
                     mensaje = "⚠️ El Excel no contiene las columnas necesarias."
                     return render(request, 'home.html', {"mensaje": mensaje})
@@ -79,60 +83,92 @@ def home(request):
             mensaje = "⚠️ Superposición de campos detectada."
             return render(request, 'home.html', {"mensaje": mensaje, "conflictos": resumen})
 
-        # Procesar por bloques
-        BLOCK_SIZE = 100000
-        block_num = 1
-        line_count = 0
-        writers = {}
-        archivos = []
-        headers = [campo["nombre"] for campo in diseño]
+        request.session["diseño"] = diseño
+        bloques = []
+        total_lineas = 0
 
         with open(full_path, "r", encoding="utf-8") as f:
-            for linea in f:
-                if line_count % BLOCK_SIZE == 0:
-                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f"_part{block_num}.csv", mode="w", encoding="utf-8", newline="")
-                    writer = csv.writer(tmp)
-                    writer.writerow(headers)
-                    writers[block_num] = writer
-                    archivos.append((block_num, tmp.name, os.path.splitext(archivo.name)[0] + f"_bloque{block_num}.csv"))
-                    if block_num == 1:
-                        preview = []
-                    block_num += 1
-                    file_obj = tmp
-                linea = linea.rstrip('\n')
-                largo = len(linea)
-                fila = []
-                for campo in diseño:
-                    ini = campo["inicio"]
-                    fin = ini + campo["longitud"]
-                    valor = linea[ini:fin].strip() if fin <= largo else ""
-                    fila.append(valor)
-                writers[block_num - 1].writerow(fila)
-                if line_count < 20:
-                    preview.append(dict(zip(headers, fila)))
-                line_count += 1
+            for i, linea in enumerate(f):
+                if i < 20:
+                    fila = []
+                    largo = len(linea.rstrip('\n'))
+                    for campo in diseño:
+                        ini = campo["inicio"]
+                        fin = ini + campo["longitud"]
+                        valor = linea[ini:fin].strip() if fin <= largo else ""
+                        fila.append(valor)
+                    preview.append(dict(zip([c["nombre"] for c in diseño], fila)))
+                total_lineas += 1
 
-        for _, path, _ in archivos:
-            try:
-                open(path).close()
-            except:
-                pass
+        BLOQUE_SIZE = 100000
+        total_bloques = (total_lineas + BLOQUE_SIZE - 1) // BLOQUE_SIZE
 
-        request.session["bloques_csv"] = archivos
-        mensaje = f"✅ {line_count:,} líneas procesadas en {len(archivos)} bloques CSV."
+        for b in range(total_bloques):
+            nombre = f"{request.session['nombre_csv_base']}_bloque{b+1}.csv"
+            bloques.append((b+1, nombre))
 
-    return render(request, 'home.html', {"mensaje": mensaje, "preview": preview, "bloques": request.session.get("bloques_csv", [])})
+        request.session["bloques_csv"] = bloques
+
+        mensaje = f"✅ {total_lineas:,} líneas detectadas. Generación dividida en {total_bloques} bloques."
+
+        return render(request, 'home.html', {
+            "mensaje": mensaje,
+            "preview": preview,
+            "bloques": bloques
+        })
+
+    return render(request, 'home.html')
 
 def descargar_excel(request):
     bloque_id = request.GET.get("bloque")
-    archivos = request.session.get("bloques_csv", [])
-    for b, path, nombre in archivos:
-        if str(b) == str(bloque_id):
-            if not os.path.exists(path):
-                return HttpResponse("⚠️ No se encontró el archivo para descargar.")
-            return FileResponse(open(path, "rb"), as_attachment=True, filename=nombre)
-    return HttpResponse("⚠️ Bloque no encontrado.")
+    ruta = request.session.get("ruta_txt")
+    diseño = request.session.get("diseño")
+    nombre_base = request.session.get("nombre_csv_base", "resultado")
+
+    if not ruta or not os.path.exists(ruta):
+        return HttpResponse("⚠️ Archivo TXT no encontrado.")
+    if not diseño:
+        return HttpResponse("⚠️ Diseño no disponible.")
+    if not bloque_id:
+        return HttpResponse("⚠️ Bloque no especificado.")
+
+    try:
+        bloque = int(bloque_id)
+    except:
+        return HttpResponse("⚠️ Bloque inválido.")
+
+    BLOQUE_SIZE = 100000
+    inicio = (bloque - 1) * BLOQUE_SIZE
+    fin = inicio + BLOQUE_SIZE
+
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f"_bloque{bloque}.csv", mode="w", encoding="utf-8", newline="")
+    writer = csv.writer(tmp)
+    writer.writerow([campo["nombre"] for campo in diseño])
+
+    with open(ruta, "r", encoding="utf-8") as f:
+        for i, linea in enumerate(f):
+            if i < inicio:
+                continue
+            if i >= fin:
+                break
+            linea = linea.rstrip('\n')
+            largo = len(linea)
+            fila = []
+            for campo in diseño:
+                ini = campo["inicio"]
+                fin_campo = ini + campo["longitud"]
+                valor = linea[ini:fin_campo].strip() if fin_campo <= largo else ""
+                fila.append(valor)
+            writer.writerow(fila)
+
+    tmp.close()
+    nombre_archivo = f"{nombre_base}_bloque{bloque}.csv"
+
+    return FileResponse(open(tmp.name, "rb"), as_attachment=True, filename=nombre_archivo)
 
 def eliminar_preview(request):
     request.session["bloques_csv"] = []
+    request.session["ruta_txt"] = None
+    request.session["nombre_csv_base"] = None
+    request.session["diseño"] = []
     return redirect('home')
