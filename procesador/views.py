@@ -6,6 +6,7 @@ import os
 import tempfile
 import traceback
 import xlsxwriter
+import re  # 👈 Para limpiar valores con caracteres invisibles
 
 def extraer_numero(texto):
     try:
@@ -34,6 +35,11 @@ def detectar_solapamientos(diseño):
             if max(inicio_i, inicio_j) <= min(fin_i, fin_j):
                 conflictos.append(f'"{nombre_i}" se superpone con "{nombre_j}" 🔴')
     return conflictos
+
+def limpiar_valor(val):
+    # Elimina caracteres invisibles y de control ASCII que rompen Excel
+    return re.sub(r'[\x00-\x08\x0B-\x1F\x7F]', '', val)
+
 def home(request):
     mensaje = None
     preview = []
@@ -160,7 +166,7 @@ def descargar_directo(request, bloque_id):
                     valor = linea[ini:fin_campo].strip() if fin_campo <= largo else ""
                     valores.append(valor)
                 for col_index, val in enumerate(valores):
-                    worksheet.write(fila_excel, col_index, val)
+                    worksheet.write(fila_excel, col_index, limpiar_valor(val))
                 fila_excel += 1
 
         workbook.close()
