@@ -5,7 +5,7 @@ import pandas as pd
 import os
 import tempfile
 import traceback
-import csv
+from openpyxl import Workbook
 
 def extraer_numero(texto):
     try:
@@ -39,9 +39,9 @@ def home(request):
     mensaje = None
     preview = []
     conflictos = []
-    request.session["bloques_csv"] = []
+    request.session["bloques_xlsx"] = []
     request.session["ruta_txt"] = None
-    request.session["nombre_csv_base"] = None
+    request.session["nombre_base"] = None
     request.session["diseño"] = []
 
     if request.method == 'POST' and request.FILES.get('archivo'):
@@ -49,7 +49,7 @@ def home(request):
         path = default_storage.save(archivo.name, archivo)
         full_path = default_storage.path(path)
         request.session["ruta_txt"] = full_path
-        request.session["nombre_csv_base"] = os.path.splitext(archivo.name)[0]
+        request.session["nombre_base"] = os.path.splitext(archivo.name)[0]
 
         diseño = []
         excel = request.FILES.get('excel_diseno')
@@ -104,12 +104,12 @@ def home(request):
         total_bloques = (total_lineas + BLOQUE_SIZE - 1) // BLOQUE_SIZE
 
         for b in range(total_bloques):
-            nombre = f"{request.session['nombre_csv_base']}_bloque{b+1}.csv"
+            nombre = f"{request.session['nombre_base']}_bloque{b+1}.xlsx"
             bloques.append((b+1, nombre))
 
-        request.session["bloques_csv"] = bloques
+        request.session["bloques_xlsx"] = bloques
 
-        mensaje = f"✅ {total_lineas:,} líneas detectadas. Generación dividida en {total_bloques} bloques."
+        mensaje = f"✅ {total_lineas:,} líneas detectadas. División en {total_bloques} bloques."
 
         return render(request, 'home.html', {
             "mensaje": mensaje,
@@ -118,12 +118,11 @@ def home(request):
         })
 
     return render(request, 'home.html')
-
 def descargar_excel(request):
     bloque_id = request.GET.get("bloque")
     ruta = request.session.get("ruta_txt")
     diseño = request.session.get("diseño")
-    nombre_base = request.session.get("nombre_csv_base", "resultado")
+    nombre_base = request.session.get("nombre_base", "resultado")
 
     if not ruta or not os.path.exists(ruta):
         return HttpResponse("⚠️ Archivo TXT no encontrado.")
@@ -141,34 +140,39 @@ def descargar_excel(request):
     inicio = (bloque - 1) * BLOQUE_SIZE
     fin = inicio + BLOQUE_SIZE
 
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f"_bloque{bloque}.csv", mode="w", encoding="utf-8", newline="")
-    writer = csv.writer(tmp)
-    writer.writerow([campo["nombre"] for campo in diseño])
+    try:
+        wb = Workbook(write_only=True)
+        ws = wb.create_sheet()
+        ws.append([campo["nombre"] for campo in diseño])
 
-    with open(ruta, "r", encoding="utf-8") as f:
-        for i, linea in enumerate(f):
-            if i < inicio:
-                continue
-            if i >= fin:
-                break
-            linea = linea.rstrip('\n')
-            largo = len(linea)
-            fila = []
-            for campo in diseño:
-                ini = campo["inicio"]
-                fin_campo = ini + campo["longitud"]
-                valor = linea[ini:fin_campo].strip() if fin_campo <= largo else ""
-                fila.append(valor)
-            writer.writerow(fila)
+        with open(ruta, "r", encoding="utf-8") as f:
+            for i, linea in enumerate(f):
+                if i < inicio:
+                    continue
+                if i >= fin:
+                    break
+                linea = linea.rstrip('\n')
+                largo = len(linea)
+                fila = []
+                for campo in diseño:
+                    ini = campo["inicio"]
+                    fin_campo = ini + campo["longitud"]
+                    valor = linea[ini:fin_campo].strip() if fin_campo <= largo else ""
+                    fila.append(valor)
+                ws.append(fila)
 
-    tmp.close()
-    nombre_archivo = f"{nombre_base}_bloque{bloque}.csv"
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f"_bloque{bloque}.xlsx")
+        wb.save(tmp.name)
+        nombre_archivo = f"{nombre_base}_bloque{bloque}.xlsx"
+        return FileResponse(open(tmp.name, "rb"), as_attachment=True, filename=nombre_archivo)
 
-    return FileResponse(open(tmp.name, "rb"), as_attachment=True, filename=nombre_archivo)
+    except Exception as e:
+        print("⚠️ Error generando Excel:", traceback.format_exc())
+        return HttpResponse("⚠️ No se pudo generar el archivo Excel.")
 
 def eliminar_preview(request):
-    request.session["bloques_csv"] = []
+    request.session["bloques_xlsx"] = []
     request.session["ruta_txt"] = None
-    request.session["nombre_csv_base"] = None
+    request.session["nombre_base"] = None
     request.session["diseño"] = []
     return redirect('home')
