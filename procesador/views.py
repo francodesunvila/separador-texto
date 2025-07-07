@@ -153,15 +153,6 @@ def descargar_excel(request):
                 return HttpResponse("⚠️ No se pudo generar el archivo Excel.")
 
         response = FileResponse(open(ruta, "rb"), as_attachment=True, filename=nombre_excel)
-
-        def borrar(r):
-            try:
-                os.remove(ruta)
-            except Exception as e:
-                print(f"⚠️ Error al borrar archivo: {e}")
-            return r
-
-        response.add_post_render_callback(borrar)
         return response
 
     except Exception as e:
