@@ -124,7 +124,9 @@ def home(request):
     return render(request, 'home.html')
 
 def descargar_directo(request, bloque_id):
-    ruta = request.session.get("ruta_txt")
+    import re
+
+    ruta_txt = request.session.get("ruta_txt")
     diseño = request.session.get("diseño")
     nombre_base = request.session.get("nombre_base", "resultado")
     bloques = request.session.get("bloques_xlsx")
@@ -134,48 +136,44 @@ def descargar_directo(request, bloque_id):
     except:
         return HttpResponse("⚠️ Bloque inválido.")
 
-    if not ruta or not os.path.exists(ruta):
+    if not ruta_txt or not os.path.exists(ruta_txt):
         return HttpResponse("⚠️ Archivo TXT no encontrado.")
     if not diseño or not bloques or bloque_id < 1 or bloque_id > len(bloques):
         return HttpResponse("⚠️ Información de bloque no disponible.")
 
-    BLOQUE_SIZE = 20000
+    BLOQUE_SIZE = 50000  # 👈 Ajustamos para este test
     inicio = (bloque_id - 1) * BLOQUE_SIZE
     fin = inicio + BLOQUE_SIZE
 
     try:
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f"_bloque{bloque_id}.xlsx")
-        workbook = xlsxwriter.Workbook(tmp.name, {'constant_memory': True})
-        worksheet = workbook.add_worksheet()
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f"_bloque{bloque_id}.csv", mode="w", encoding="utf-8")
+        nombres = [campo["nombre"] for campo in diseño]
+        tmp.write(",".join(nombres) + "\n")
 
-        for col_index, campo in enumerate(diseño):
-            worksheet.write(0, col_index, campo["nombre"])
-
-        with open(ruta, "r", encoding="utf-8") as f:
-            fila_excel = 1
-            for i, linea in enumerate(f):
+        with open(ruta_txt, "r", encoding="utf-8") as fuente:
+            for i, linea in enumerate(fuente):
                 if i < inicio:
                     continue
                 if i >= fin:
                     break
                 largo = len(linea.rstrip('\n'))
-                valores = []
+                fila = []
                 for campo in diseño:
                     ini = campo["inicio"]
                     fin_campo = ini + campo["longitud"]
                     valor = linea[ini:fin_campo].strip() if fin_campo <= largo else ""
-                    valores.append(valor)
-                for col_index, val in enumerate(valores):
-                    worksheet.write(fila_excel, col_index, limpiar_valor(val))
-                fila_excel += 1
+                    valor = re.sub(r'[\x00-\x08\x0B-\x1F\x7F]', '', valor)  # 🧹 limpiamos control chars
+                    valor = valor.replace(",", "")  # 🧨 eliminamos comas internas
+                    fila.append(valor)
+                tmp.write(",".join(fila) + "\n")
 
-        workbook.close()
-        nombre_archivo = f"{nombre_base}_bloque{bloque_id}.xlsx"
+        tmp.close()
+        nombre_archivo = f"{nombre_base}_bloque{bloque_id}.csv"
         return FileResponse(open(tmp.name, "rb"), as_attachment=True, filename=nombre_archivo)
 
     except Exception as e:
-        print("⚠️ Error generando Excel:", traceback.format_exc())
-        return HttpResponse("⚠️ No se pudo generar el archivo Excel.")
+        print("⚠️ Error generando CSV:", traceback.format_exc())
+        return HttpResponse("⚠️ No se pudo generar el archivo CSV.")
 
 def eliminar_preview(request):
     request.session["bloques_xlsx"] = []
