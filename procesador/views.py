@@ -89,8 +89,7 @@ def home(request):
         request.session["diseño"] = diseño
         bloques = []
 
-        # ✅ Leer 20 líneas para preview + contar total con precisión
-        total_lineas = 0
+        # ✅ Leer preview + contar todas las líneas correctamente
         with open(full_path, "r", encoding="utf-8") as f:
             for i, linea in enumerate(f):
                 if i < 20:
@@ -102,7 +101,7 @@ def home(request):
                         valor = linea[ini:fin].strip() if fin <= largo else ""
                         fila.append(valor)
                     preview.append(dict(zip([c["nombre"] for c in diseño], fila)))
-            total_lineas = i + 1  # 🧠 Conteo total seguro
+            total_lineas = i + 1
 
         BLOQUE_SIZE = 5000
         total_bloques = (total_lineas + BLOQUE_SIZE - 1) // BLOQUE_SIZE
@@ -121,7 +120,6 @@ def home(request):
         })
 
     return render(request, 'home.html')
-
 def descargar_directo(request, bloque_id):
     import re
 
@@ -176,3 +174,11 @@ def descargar_directo(request, bloque_id):
     except Exception as e:
         print("⚠️ Error generando Excel:", traceback.format_exc())
         return HttpResponse("⚠️ No se pudo generar el archivo Excel.")
+
+
+def eliminar_preview(request):
+    request.session["bloques_xlsx"] = []
+    request.session["ruta_txt"] = None
+    request.session["nombre_base"] = None
+    request.session["diseño"] = []
+    return redirect('home')
