@@ -59,9 +59,10 @@ def home(request):
 
         # 🧠 Nuevo soporte: Excel o carga manual
         excel = request.FILES.get('excel_diseno')
-        campo_list = request.POST.getlist("campo[]")
-        posicion_list = request.POST.getlist("posicion[]")
-        caracter_list = request.POST.getlist("caracter[]")
+        campo_list = request.POST.getlist("nombre[]")
+        posicion_list = request.POST.getlist("inicio[]")
+        caracter_list = request.POST.getlist("longitud[]")
+
 
         if excel:
             try:
