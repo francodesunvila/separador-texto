@@ -4,10 +4,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Separador de Texto</title>
+  <title>Conciliador Web</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'estilos.css' %}">
 </head>
+
 <body class="modern-body">
+  <!-- Overlay de carga -->
+  <div id="overlay" class="loader-overlay hidden">
+    <div class="loader-content">
+      <div class="spinner"></div>
+      <div class="loading-text">Procesando...</div>
+    </div>
+  </div>
+
+  <!-- Modal de mensajes -->
+  <div id="customModal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <div class="modal-box" style="max-height: 300px; overflow-y: auto; width: 100%;">
+        <p id="modalMessage" class="modal-message" style="white-space: pre-line;"></p>
+      </div>
+      <button onclick="hideModal()" class="modal-button">Aceptar</button>
+    </div>
+  </div>
 
   <div class="app-container">
     <header class="app-header">
@@ -19,45 +39,75 @@
       <p class="django-message">{{ mensaje }}</p>
     {% endif %}
 
-    <form method="POST" enctype="multipart/form-data" class="main-form">
+    <form method="POST" enctype="multipart/form-data" onsubmit="return validarYMostrarLoader();" class="main-form">
       {% csrf_token %}
-
       <section class="section-card">
         <h2 class="section-title">Carga de Archivos</h2>
 
         <div class="form-group">
           <label for="txtFile" class="form-label">Archivo TXT:</label>
-          <input type="file" name="archivo" id="txtFile" required>
+          <div class="file-input-wrapper">
+            <input type="file" id="txtFile" name="archivo" class="hidden-file-input" accept=".txt" required>
+            <label for="txtFile" class="custom-file-button">Seleccionar archivo</label>
+            <span id="txtFileName" class="file-name-display">Ningún archivo seleccionado</span>
+          </div>
         </div>
 
         <div class="form-group">
-          <label for="excelDiseno" class="form-label">Diseño desde Excel (.xlsx con columnas: campo, posicion, caracter):</label>
-          <input type="file" name="excel_diseno" id="excelDiseno" accept=".xlsx,.xls">
+          <label for="excelDiseno" class="form-label">Importar diseño desde Excel (<span class="font-mono">.xlsx</span> con columnas: <span class="font-mono">campo, posicion, caracter</span>):</label>
+          <div class="file-input-wrapper">
+            <input type="file" id="excelDiseno" name="excel_diseno" class="hidden-file-input" accept=".xlsx,.xls">
+            <label for="excelDiseno" class="custom-file-button">Seleccionar archivo</label>
+            <span id="excelFileName" class="file-name-display">Ningún archivo seleccionado</span>
+          </div>
         </div>
 
-        <button type="submit" class="modern-button button-purple">Procesar archivo</button>
+        <div class="button-group excel-buttons">
+          <button type="button" onclick="procesarDisenoExcel()" class="modern-button button-blue">
+            Procesar diseño desde Excel
+          </button>
+          <button type="button" onclick="cancelarDisenoExcel()" class="modern-button button-red">
+            Cancelar diseño desde Excel
+          </button>
+        </div>
+      </section>
+
+      <section class="section-card">
+        <h2 class="section-title">DISEÑO DE CAMPOS</h2>
+        <div class="table-container">
+          <table id="tabla-campos" class="modern-table">
+            <thead><tr><th>Campo</th><th>Posición</th><th>Carácter</th><th>Quitar</th></tr></thead>
+            <tbody id="campos">
+              <tr>
+                <td><input type="text" name="nombre[]" placeholder="Ej: banco" required class="modern-input"></td>
+                <td><input type="number" name="inicio[]" placeholder="Ej: 0" required class="modern-input"></td>
+                <td><input type="number" name="longitud[]" placeholder="Ej: 3" required class="modern-input"></td>
+                <td><button type="button" onclick="this.closest('tr').remove()" class="remove-button">❌</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="button-group field-buttons">
+          <button type="button" onclick="agregarCampo()" class="modern-button button-green">Agregar campo</button>
+          <button type="submit" class="modern-button button-green">Finalizar y generar vista previa</button>
+        </div>
+
+        <div id="errores" class="error-message"></div>
       </section>
     </form>
 
     {% if preview %}
       <section class="section-card">
-        <h3 class="section-title preview-title">Vista previa (primeras 20 líneas)</h3>
+        <h3 class="section-title preview-title">Vista previa (primeras 20 filas)</h3>
         <div class="table-container">
           <table class="modern-table">
             <thead>
-              <tr>
-                {% for key in preview.0.keys %}
-                  <th>{{ key }}</th>
-                {% endfor %}
-              </tr>
+              <tr>{% for key in preview.0.keys %}<th>{{ key }}</th>{% endfor %}</tr>
             </thead>
             <tbody>
               {% for fila in preview %}
-                <tr>
-                  {% for valor in fila.values %}
-                    <td>{{ valor }}</td>
-                  {% endfor %}
-                </tr>
+                <tr>{% for valor in fila.values %}<td>{{ valor }}</td>{% endfor %}</tr>
               {% endfor %}
             </tbody>
           </table>
@@ -67,7 +117,7 @@
 
     {% if bloques %}
       <section class="section-card">
-        <h3 class="section-title">Descarga por bloques</h3>
+        <h3 class="section-title">Descargas disponibles por bloque</h3>
         <div class="table-container">
           <table class="modern-table">
             <thead>
@@ -76,11 +126,11 @@
             <tbody>
               {% for b in bloques %}
                 <tr>
-                  <td>{{ b.0 }}</td>
+                  <td>Bloque {{ b.0 }}</td>
                   <td>{{ b.1 }}</td>
                   <td>
-                    <a href="{% url 'descargar_excel' %}?bloque={{ b.0 }}" class="modern-button button-teal" target="_blank">
-                      📥 Descargar bloque {{ b.0 }}
+                    <a href="/descargar_excel?bloque={{ b.0 }}" class="modern-button button-teal" target="_blank">
+                      📥 Descargar
                     </a>
                   </td>
                 </tr>
@@ -88,13 +138,11 @@
             </tbody>
           </table>
         </div>
-        <form method="POST" action="{% url 'eliminar_preview' %}" class="button-group delete-buttons">
-          {% csrf_token %}
-          <button type="submit" class="modern-button button-gray">Eliminar vista previa</button>
-        </form>
       </section>
     {% endif %}
-  </div>
+
+  </div> <!-- Cierre .app-container -->
+
 
   <script >
   // 🔷 MODAL PERSONALIZADO
