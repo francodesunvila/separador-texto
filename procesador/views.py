@@ -8,7 +8,9 @@ import traceback
 
 def extraer_numero(texto):
     try:
-        return int(str(texto).strip())
+        match = str(texto).strip()
+        numbers = [int(s) for s in match.split() if s.isdigit()]
+        return numbers[0] if numbers else 0
     except:
         return 0
 
@@ -59,14 +61,10 @@ def home(request):
                 df_diseño = pd.read_excel(excel)
                 columnas = df_diseño.columns.str.lower()
                 if {"campo", "posicion", "caracter"}.issubset(set(columnas)):
-                    # ✅ Convertir columnas a enteros
-                    df_diseño["posicion"] = df_diseño["posicion"].astype(int)
-                    df_diseño["caracter"] = df_diseño["caracter"].astype(int)
-
                     for _, fila in df_diseño.iterrows():
                         nombre = str(fila.get("campo", "")).strip()
-                        inicio = int(fila.get("posicion"))
-                        longitud = int(fila.get("caracter"))
+                        inicio = extraer_numero(fila.get("posicion"))
+                        longitud = extraer_numero(fila.get("caracter"))
                         if nombre and longitud > 0:
                             diseño.append({"nombre": nombre, "inicio": inicio, "longitud": longitud})
                     mensaje = "✅ Diseño importado desde Excel correctamente."
@@ -141,7 +139,7 @@ def descargar_excel(request):
             return HttpResponse("⚠️ No hay datos disponibles para descargar.")
 
         df = pd.DataFrame(datos)
-        df.fillna("", inplace=True)  # ✅ Evita NaN que rompen to_excel
+        df.fillna("", inplace=True)
 
         with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
             ruta = tmp.name
