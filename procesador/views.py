@@ -38,6 +38,7 @@ def detectar_solapamientos(diseño):
 
 def limpiar_valor(val):
     return re.sub(r'[\x00-\x08\x0B-\x1F\x7F]', '', val)
+
 def home(request):
     mensaje = None
     preview = []
@@ -55,7 +56,12 @@ def home(request):
         request.session["nombre_base"] = os.path.splitext(archivo.name)[0]
 
         diseño = []
+
+        # 🧠 Nuevo soporte: Excel o carga manual
         excel = request.FILES.get('excel_diseno')
+        campo_list = request.POST.getlist("campo[]")
+        posicion_list = request.POST.getlist("posicion[]")
+        caracter_list = request.POST.getlist("caracter[]")
 
         if excel:
             try:
@@ -74,8 +80,16 @@ def home(request):
             except Exception as e:
                 mensaje = f"⚠️ Error al leer Excel: {str(e)}"
                 return render(request, 'home.html', {"mensaje": mensaje})
-        else:
-            mensaje = "⚠️ No se adjuntó Excel de diseño."
+        elif campo_list and posicion_list and caracter_list:
+            for nombre, pos, car in zip(campo_list, posicion_list, caracter_list):
+                nombre = str(nombre).strip()
+                inicio = extraer_numero(pos)
+                longitud = extraer_numero(car)
+                if nombre and longitud > 0:
+                    diseño.append({"nombre": nombre, "inicio": inicio, "longitud": longitud})
+
+        if not diseño:
+            mensaje = "⚠️ No se adjuntó un diseño válido ni se completaron campos manuales."
             return render(request, 'home.html', {"mensaje": mensaje})
 
         conflictos = detectar_solapamientos(diseño)
@@ -120,6 +134,7 @@ def home(request):
         })
 
     return render(request, 'home.html')
+
 def descargar_directo(request, bloque_id):
     import re
 
