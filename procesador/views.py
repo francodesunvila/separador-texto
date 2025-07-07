@@ -83,9 +83,9 @@ def home(request):
             mensaje = "⚠️ Superposición de campos detectada."
             return render(request, 'home.html', {"mensaje": mensaje, "conflictos": resumen})
 
-        # Crear Excel línea por línea
-        wb = Workbook()
-        ws = wb.active
+        # Crear Excel en modo streaming
+        wb = Workbook(write_only=True)
+        ws = wb.create_sheet()
         ws.append([campo["nombre"] for campo in diseño])
 
         count = 0
@@ -105,7 +105,7 @@ def home(request):
                     preview.append(dict(zip([c["nombre"] for c in diseño], fila)))
                 count += 1
 
-        # Guardar Excel final
+        # Guardar Excel final en archivo temporal
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
         wb.save(tmp.name)
         request.session["ruta_excel"] = tmp.name
