@@ -139,7 +139,8 @@ def descargar_excel(request):
         ruta = request.session.get("ruta_excel")
         nombre = request.session.get("nombre_excel", "resultado.xlsx")
 
-        if not ruta or not os.path.exists(ruta):
+        if not ruta or not os.path.isfile(ruta):
+            print(f"⚠️ Archivo no encontrado: {ruta}")
             return HttpResponse("⚠️ No se encontró el archivo para descargar.")
 
         return FileResponse(open(ruta, "rb"), as_attachment=True, filename=nombre)
