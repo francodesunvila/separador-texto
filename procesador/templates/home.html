@@ -11,7 +11,6 @@
 </head>
 
 <body class="modern-body">
-  <!-- Overlay de carga -->
   <div id="overlay" class="loader-overlay hidden">
     <div class="loader-content">
       <div class="spinner"></div>
@@ -19,7 +18,6 @@
     </div>
   </div>
 
-  <!-- Modal de mensajes -->
   <div id="customModal" class="modal-overlay hidden">
     <div class="modal-content">
       <div class="modal-box" style="max-height: 300px; overflow-y: auto; width: 100%;">
@@ -75,8 +73,7 @@
           </button>
         </div>
       </section>
-
-      <section class="section-card">
+            <section class="section-card">
         <h2 class="section-title">DISEÑO DE CAMPOS</h2>
         <div class="table-container">
           <table id="tabla-campos" class="modern-table">
@@ -111,9 +108,10 @@
         <div id="errores" class="error-message"></div>
       </section>
     </form>
-        {% if preview %}
+
+    {% if preview %}
       <section class="section-card">
-        <h3 class="section-title preview-title">Vista previa (primeras 5 filas)</h3>
+        <h3 class="section-title preview-title">Vista previa (primeras 20 filas)</h3>
         <div class="table-container">
           <table class="modern-table">
             <thead>
@@ -126,38 +124,37 @@
             </tbody>
           </table>
         </div>
-
-        <form id="formDescarga" method="POST" action="{% url 'descargar_excel' %}" onsubmit="return iniciarDescarga();" class="button-group download-buttons">
-          {% csrf_token %}
-          <button type="submit" id="btnDescargar" class="modern-button button-teal">
-            <svg class="button-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-            </svg> Descargar Excel completo
-          </button>
-          <span id="spinnerDescarga" class="inline-spinner hidden">
-            <span class="inline-spinner-circle"></span>Procesando...
-          </span>
-          <button type="button" onclick="cancelarDescarga()" class="modern-button button-red">
-            <svg class="button-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg> Cancelar descarga
-          </button>
-        </form>
-
-        <form method="POST" action="{% url 'eliminar_preview' %}" onsubmit="return mostrarEliminar();" class="button-group delete-buttons">
-          {% csrf_token %}
-          <button type="submit" id="btnEliminar" class="modern-button button-gray">
-            <svg class="button-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-            </svg> Eliminar vista previa
-          </button>
-          <span id="spinnerEliminar" class="inline-spinner hidden">
-            <span class="inline-spinner-circle"></span>Procesando...
-          </span>
-        </form>
       </section>
     {% endif %}
-  </div>
+
+    {% if bloques %}
+      <section class="section-card">
+        <h3 class="section-title">Descargas disponibles por bloque</h3>
+        <div class="table-container">
+          <table class="modern-table">
+            <thead>
+              <tr><th>Bloque</th><th>Archivo</th><th>Descargar</th></tr>
+            </thead>
+            <tbody>
+              {% for b in bloques %}
+                <tr>
+                  <td>Bloque {{ b.0 }}</td>
+                  <td>{{ b.2 }}</td>
+                  <td>
+                    <a href="/descargar_excel?bloque={{ b.0 }}" class="modern-button button-teal" target="_blank">
+                      📥 Descargar
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    {% endif %}
+
+  </div> <!-- Cierre .app-container -->
+
 
   <script >
   // 🔷 MODAL PERSONALIZADO

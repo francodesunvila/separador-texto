@@ -23,7 +23,6 @@ def detectar_solapamientos(diseño):
             nombre_i = str(diseño[i]['nombre']).strip()
         except:
             continue
-
         for j in range(i + 1, len(diseño)):
             try:
                 inicio_j = int(diseño[j]['inicio'])
@@ -32,18 +31,15 @@ def detectar_solapamientos(diseño):
                 nombre_j = str(diseño[j]['nombre']).strip()
             except:
                 continue
-
             if max(inicio_i, inicio_j) <= min(fin_i, fin_j):
                 conflictos.append(f'"{nombre_i}" se superpone con "{nombre_j}" 🔴')
-
     return conflictos
 
 def home(request):
     mensaje = None
     preview = []
     conflictos = []
-    request.session["ruta_csv"] = None
-    request.session["nombre_csv"] = None
+    request.session["bloques_csv"] = []
 
     if request.method == 'POST' and request.FILES.get('archivo'):
         archivo = request.FILES['archivo']
@@ -83,14 +79,26 @@ def home(request):
             mensaje = "⚠️ Superposición de campos detectada."
             return render(request, 'home.html', {"mensaje": mensaje, "conflictos": resumen})
 
-        # Crear CSV directamente desde texto
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".csv", mode="w", encoding="utf-8", newline="")
-        writer = csv.writer(tmp)
-        writer.writerow([campo["nombre"] for campo in diseño])
+        # Procesar por bloques
+        BLOCK_SIZE = 100000
+        block_num = 1
+        line_count = 0
+        writers = {}
+        archivos = []
+        headers = [campo["nombre"] for campo in diseño]
 
-        count = 0
         with open(full_path, "r", encoding="utf-8") as f:
             for linea in f:
+                if line_count % BLOCK_SIZE == 0:
+                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f"_part{block_num}.csv", mode="w", encoding="utf-8", newline="")
+                    writer = csv.writer(tmp)
+                    writer.writerow(headers)
+                    writers[block_num] = writer
+                    archivos.append((block_num, tmp.name, os.path.splitext(archivo.name)[0] + f"_bloque{block_num}.csv"))
+                    if block_num == 1:
+                        preview = []
+                    block_num += 1
+                    file_obj = tmp
                 linea = linea.rstrip('\n')
                 largo = len(linea)
                 fila = []
@@ -99,35 +107,32 @@ def home(request):
                     fin = ini + campo["longitud"]
                     valor = linea[ini:fin].strip() if fin <= largo else ""
                     fila.append(valor)
-                writer.writerow(fila)
+                writers[block_num - 1].writerow(fila)
+                if line_count < 20:
+                    preview.append(dict(zip(headers, fila)))
+                line_count += 1
 
-                if count < 20:
-                    preview.append(dict(zip([c["nombre"] for c in diseño], fila)))
-                count += 1
+        for _, path, _ in archivos:
+            try:
+                open(path).close()
+            except:
+                pass
 
-        tmp.close()
-        request.session["ruta_csv"] = tmp.name
-        request.session["nombre_csv"] = os.path.splitext(archivo.name)[0] + ".csv"
-        mensaje = f"✅ {count:,} líneas procesadas correctamente."
+        request.session["bloques_csv"] = archivos
+        mensaje = f"✅ {line_count:,} líneas procesadas en {len(archivos)} bloques CSV."
 
-    return render(request, 'home.html', {"mensaje": mensaje, "preview": preview})
+    return render(request, 'home.html', {"mensaje": mensaje, "preview": preview, "bloques": request.session.get("bloques_csv", [])})
 
 def descargar_excel(request):
-    try:
-        ruta = request.session.get("ruta_csv")
-        nombre = request.session.get("nombre_csv", "resultado.csv")
-
-        if not ruta or not os.path.exists(ruta):
-            print(f"⚠️ Archivo no encontrado: {ruta}")
-            return HttpResponse("⚠️ No se encontró el archivo para descargar.")
-
-        return FileResponse(open(ruta, "rb"), as_attachment=True, filename=nombre)
-
-    except Exception as e:
-        print("⚠️ Error en descarga_excel:", traceback.format_exc())
-        return HttpResponse("⚠️ No se pudo generar el archivo CSV.")
+    bloque_id = request.GET.get("bloque")
+    archivos = request.session.get("bloques_csv", [])
+    for b, path, nombre in archivos:
+        if str(b) == str(bloque_id):
+            if not os.path.exists(path):
+                return HttpResponse("⚠️ No se encontró el archivo para descargar.")
+            return FileResponse(open(path, "rb"), as_attachment=True, filename=nombre)
+    return HttpResponse("⚠️ Bloque no encontrado.")
 
 def eliminar_preview(request):
-    request.session["ruta_csv"] = None
-    request.session["nombre_csv"] = None
+    request.session["bloques_csv"] = []
     return redirect('home')

@@ -429,7 +429,20 @@
   border: 2px solid #ff4d4d;
   background-color: #220000;
 }
+.boton-descarga {
+  display: inline-block;
+  padding: 8px 14px;
+  margin: 6px 0;
+  background-color: #087ea4;
+  color: white;
+  text-decoration: none;
+  border-radius: 6px;
+  font-weight: bold;
+}
 
+.boton-descarga:hover {
+  background-color: #095d80;
+}
 
 /* Responsive Design */
 @media (max-width: 768px) {
