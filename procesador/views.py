@@ -5,7 +5,7 @@ import pandas as pd
 import os
 import tempfile
 import traceback
-from openpyxl import Workbook
+import csv
 
 def extraer_numero(texto):
     try:
@@ -42,8 +42,8 @@ def home(request):
     mensaje = None
     preview = []
     conflictos = []
-    request.session["ruta_excel"] = None
-    request.session["nombre_excel"] = None
+    request.session["ruta_csv"] = None
+    request.session["nombre_csv"] = None
 
     if request.method == 'POST' and request.FILES.get('archivo'):
         archivo = request.FILES['archivo']
@@ -83,10 +83,10 @@ def home(request):
             mensaje = "⚠️ Superposición de campos detectada."
             return render(request, 'home.html', {"mensaje": mensaje, "conflictos": resumen})
 
-        # Crear Excel en modo streaming
-        wb = Workbook(write_only=True)
-        ws = wb.create_sheet()
-        ws.append([campo["nombre"] for campo in diseño])
+        # Crear CSV directamente desde texto
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".csv", mode="w", encoding="utf-8", newline="")
+        writer = csv.writer(tmp)
+        writer.writerow([campo["nombre"] for campo in diseño])
 
         count = 0
         with open(full_path, "r", encoding="utf-8") as f:
@@ -99,27 +99,23 @@ def home(request):
                     fin = ini + campo["longitud"]
                     valor = linea[ini:fin].strip() if fin <= largo else ""
                     fila.append(valor)
-                ws.append(fila)
+                writer.writerow(fila)
 
                 if count < 20:
                     preview.append(dict(zip([c["nombre"] for c in diseño], fila)))
                 count += 1
 
-        # Guardar Excel final en archivo temporal
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
-        wb.save(tmp.name)
-        request.session["ruta_excel"] = tmp.name
-        request.session["nombre_excel"] = os.path.splitext(archivo.name)[0] + ".xlsx"
-
+        tmp.close()
+        request.session["ruta_csv"] = tmp.name
+        request.session["nombre_csv"] = os.path.splitext(archivo.name)[0] + ".csv"
         mensaje = f"✅ {count:,} líneas procesadas correctamente."
 
     return render(request, 'home.html', {"mensaje": mensaje, "preview": preview})
 
 def descargar_excel(request):
-    import traceback
     try:
-        ruta = request.session.get("ruta_excel")
-        nombre = request.session.get("nombre_excel", "resultado.xlsx")
+        ruta = request.session.get("ruta_csv")
+        nombre = request.session.get("nombre_csv", "resultado.csv")
 
         if not ruta or not os.path.exists(ruta):
             print(f"⚠️ Archivo no encontrado: {ruta}")
@@ -129,9 +125,9 @@ def descargar_excel(request):
 
     except Exception as e:
         print("⚠️ Error en descarga_excel:", traceback.format_exc())
-        return HttpResponse("⚠️ No se pudo generar el archivo Excel.")
+        return HttpResponse("⚠️ No se pudo generar el archivo CSV.")
 
 def eliminar_preview(request):
-    request.session["ruta_excel"] = None
-    request.session["nombre_excel"] = None
+    request.session["ruta_csv"] = None
+    request.session["nombre_csv"] = None
     return redirect('home')
