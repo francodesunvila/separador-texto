@@ -3,17 +3,36 @@ from django.core.files.storage import default_storage
 from django.http import HttpResponse, FileResponse
 import pandas as pd
 import os
-import io
 import re
 import tempfile
 
 def extraer_numero(texto):
-    match = re.search(r'\d+', str(texto))
-    return int(match.group()) if match else 0
+    try:
+        return int(str(texto).strip())
+    except:
+        return 0
+
+def detectar_solapamientos(diseño):
+    conflictos = []
+    for i in range(len(diseño)):
+        inicio_i = diseño[i]['inicio']
+        fin_i = inicio_i + diseño[i]['longitud']
+        nombre_i = diseño[i]['nombre']
+
+        for j in range(i + 1, len(diseño)):
+            inicio_j = diseño[j]['inicio']
+            fin_j = inicio_j + diseño[j]['longitud']
+            nombre_j = diseño[j]['nombre']
+
+            if max(inicio_i, inicio_j) < min(fin_i, fin_j):
+                conflictos.append(f'"{nombre_i}" se superpone con "{nombre_j}" 🔴')
+
+    return conflictos
 
 def home(request):
     preview = None
     mensaje = None
+    conflictos = []
 
     if request.method == 'GET':
         request.session["datos"] = None
@@ -33,13 +52,10 @@ def home(request):
                 columnas = df_diseño.columns.str.lower()
                 if {"campo", "posicion", "caracter"}.issubset(set(columnas)):
                     for _, fila in df_diseño.iterrows():
-                        try:
-                            nombre = str(fila.get("campo", "")).strip()
-                            inicio = extraer_numero(fila.get("posicion"))
-                            longitud = extraer_numero(fila.get("caracter"))
-                            diseño.append({"nombre": nombre, "inicio": inicio, "longitud": longitud})
-                        except:
-                            continue
+                        nombre = str(fila.get("campo", "")).strip()
+                        inicio = extraer_numero(fila.get("posicion"))
+                        longitud = extraer_numero(fila.get("caracter"))
+                        diseño.append({"nombre": nombre, "inicio": inicio, "longitud": longitud})
                     mensaje = "✅ Diseño importado desde Excel correctamente."
                 else:
                     mensaje = "⚠️ El Excel no contiene las columnas necesarias: campo, posicion, caracter."
@@ -61,6 +77,17 @@ def home(request):
                     diseño.append(campo)
                 except:
                     continue
+
+        conflictos = detectar_solapamientos(diseño)
+        if conflictos:
+            resumen = conflictos[:5]
+            if len(conflictos) > 5:
+                resumen.append(f"...y {len(conflictos) - 5} conflictos más.")
+            mensaje = "⚠️ Se detectaron superposiciones en el diseño."
+            return render(request, 'home.html', {
+                "mensaje": mensaje,
+                "conflictos": resumen
+            })
 
         datos = []
         with open(full_path, "r", encoding="utf-8") as f:
@@ -99,16 +126,12 @@ def descargar_excel(request):
         return HttpResponse("No hay datos procesados.")
 
     df = pd.DataFrame(datos)
-
-    # ✅ Usar archivo temporal
     with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as tmp:
         ruta = tmp.name
         df.to_excel(ruta, index=False)
 
-    # 📦 Descargar archivo
     response = FileResponse(open(ruta, "rb"), as_attachment=True, filename=nombre_excel)
 
-    # 🧹 Borrarlo automáticamente después
     def borrar(r):
         try:
             os.remove(ruta)
