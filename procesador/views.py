@@ -100,7 +100,7 @@ def home(request):
                     preview.append(dict(zip([c["nombre"] for c in diseño], fila)))
                 total_lineas += 1
 
-        BLOQUE_SIZE = 100000
+        BLOQUE_SIZE = 50000
         total_bloques = (total_lineas + BLOQUE_SIZE - 1) // BLOQUE_SIZE
 
         for b in range(total_bloques):
