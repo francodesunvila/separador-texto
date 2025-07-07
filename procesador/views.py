@@ -6,7 +6,7 @@ import os
 import tempfile
 import traceback
 import xlsxwriter
-import re  # 👈 Para limpiar valores con caracteres invisibles
+import re  # Para limpiar caracteres invisibles
 
 def extraer_numero(texto):
     try:
@@ -37,9 +37,7 @@ def detectar_solapamientos(diseño):
     return conflictos
 
 def limpiar_valor(val):
-    # Elimina caracteres invisibles y de control ASCII que rompen Excel
     return re.sub(r'[\x00-\x08\x0B-\x1F\x7F]', '', val)
-
 def home(request):
     mensaje = None
     preview = []
@@ -90,8 +88,9 @@ def home(request):
 
         request.session["diseño"] = diseño
         bloques = []
-        total_lineas = 0
 
+        # ✅ Leer 20 líneas para preview + contar total con precisión
+        total_lineas = 0
         with open(full_path, "r", encoding="utf-8") as f:
             for i, linea in enumerate(f):
                 if i < 20:
@@ -103,9 +102,9 @@ def home(request):
                         valor = linea[ini:fin].strip() if fin <= largo else ""
                         fila.append(valor)
                     preview.append(dict(zip([c["nombre"] for c in diseño], fila)))
-                total_lineas += 1
+            total_lineas = i + 1  # 🧠 Conteo total seguro
 
-        BLOQUE_SIZE = 20000
+        BLOQUE_SIZE = 5000
         total_bloques = (total_lineas + BLOQUE_SIZE - 1) // BLOQUE_SIZE
 
         for b in range(total_bloques):
@@ -141,7 +140,7 @@ def descargar_directo(request, bloque_id):
     if not diseño or not bloques or bloque_id < 1 or bloque_id > len(bloques):
         return HttpResponse("⚠️ Información de bloque no disponible.")
 
-    BLOQUE_SIZE = 5000  # 🔒 Para que Render lo maneje bien
+    BLOQUE_SIZE = 5000
     inicio = (bloque_id - 1) * BLOQUE_SIZE
     fin = inicio + BLOQUE_SIZE
 
@@ -166,7 +165,7 @@ def descargar_directo(request, bloque_id):
                     ini = campo["inicio"]
                     fin_campo = ini + campo["longitud"]
                     valor = linea[ini:fin_campo].strip() if fin_campo <= largo else ""
-                    valor = re.sub(r'[\x00-\x08\x0B-\x1F\x7F]', '', valor)
+                    valor = limpiar_valor(valor)
                     worksheet.write(fila_excel, col_index, valor)
                 fila_excel += 1
 
@@ -177,10 +176,3 @@ def descargar_directo(request, bloque_id):
     except Exception as e:
         print("⚠️ Error generando Excel:", traceback.format_exc())
         return HttpResponse("⚠️ No se pudo generar el archivo Excel.")
-
-def eliminar_preview(request):
-    request.session["bloques_xlsx"] = []
-    request.session["ruta_txt"] = None
-    request.session["nombre_base"] = None
-    request.session["diseño"] = []
-    return redirect('home')
