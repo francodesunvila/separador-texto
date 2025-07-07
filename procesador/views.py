@@ -163,9 +163,11 @@ def descargar_directo(request, bloque_id):
         workbook = xlsxwriter.Workbook(tmp.name, {'constant_memory': True})
         worksheet = workbook.add_worksheet()
 
-        # Escribir encabezados
+        # Escribir encabezados definidos
         for col_index, campo in enumerate(diseño):
             worksheet.write(0, col_index, campo["nombre"])
+        # Encabezado para campo extra
+        worksheet.write(0, len(diseño), "sin definir")
 
         with open(ruta, "r", encoding="utf-8") as f:
             fila_excel = 1
@@ -175,12 +177,26 @@ def descargar_directo(request, bloque_id):
                 if i >= fin:
                     break
                 largo = len(linea.rstrip('\n'))
+
+                # Escribir campos definidos
                 for col_index, campo in enumerate(diseño):
                     ini = campo["inicio"]
                     fin_campo = ini + campo["longitud"]
                     valor = linea[ini:fin_campo].strip() if fin_campo <= largo else ""
                     valor = limpiar_valor(valor)
                     worksheet.write(fila_excel, col_index, valor)
+
+                # Detectar el final del último campo definido
+                try:
+                    ultimo = max(c["inicio"] + c["longitud"] for c in diseño if c["longitud"] > 0)
+                except:
+                    ultimo = 0
+
+                # Escribir campo adicional "sin definir"
+                resto = linea[ultimo:].rstrip('\n') if ultimo < largo else ""
+                resto = limpiar_valor(resto)
+                worksheet.write(fila_excel, len(diseño), resto)
+
                 fila_excel += 1
 
         workbook.close()
